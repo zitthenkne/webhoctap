@@ -1,7 +1,9 @@
 // File: app.js
 import { auth, db } from './firebase-init.js';
 import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js";
-import { doc, setDoc, collection, addDoc, query, where, getDocs, getDoc, orderBy, limit, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js";
+import { doc, setDoc, collection, addDoc, query, where, getDocs, getDoc, orderBy, limit, deleteDoc, updateDoc, runTransaction } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js";
+import { showToast } from './utils.js';
+import { achievements, checkAndAwardAchievement } from './achievements.js';
 
 // ... (Toàn bộ các hằng số const giữ nguyên như trước)
 const menuToggleBtn = document.getElementById('menu-toggle-btn');
@@ -28,10 +30,10 @@ const selectGpaCalculatorBtn = document.getElementById('selectGpaCalculator');
 const calculateGpaBtn = document.getElementById('calculate-gpa-btn');
 const gpaResultArea = document.getElementById('gpa-result-area');
 const downloadTemplateBtn = document.getElementById('download-template-btn');
-
+const publicQuizListContainer = document.getElementById('public-quiz-list-container');
 
 let questions = [];
-let currentQuizTitle = '';
+let userQuizSets = []; // Biến cache để tìm kiếm phía client
 let progressChartInstance = null; // Biến để giữ instance của biểu đồ
 
 // ... (Các hàm từ onAuthStateChanged đến parseFile giữ nguyên)
@@ -59,31 +61,217 @@ function showContent(targetId, title = 'Dashboard') {
     if (targetId === 'statsContent') {
         loadAndDisplayStats();
     }
+    if (targetId === 'publicLibraryContent') {
+        loadAndDisplayPublicLibrary();
+    }
 }
 
 onAuthStateChanged(auth, user => { if (user) { userName.textContent = user.email.split('@')[0]; userAvatar.src = `https://ui-avatars.com/api/?name=${user.email[0]}&background=FF69B4&color=fff`; userMenuButton.onclick = handleLogout; } else { userName.textContent = 'Khách'; userAvatar.src = `https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff`; userMenuButton.onclick = toggleAuthModal; } });
-async function handleLogout() { if (confirm('Bạn có chắc muốn đăng xuất?')) await signOut(auth); }
+async function handleLogout() { if (confirm('Bạn có chắc muốn đăng xuất?')) { await signOut(auth); showToast('Đã đăng xuất!', 'info'); } }
 function toggleAuthModal() { authModal.classList.toggle('hidden'); }
-async function handleLogin() { const email = document.getElementById('emailInput').value; const password = document.getElementById('passwordInput').value; if (!email || !password) return alert('Vui lòng nhập đủ thông tin.'); try { await signInWithEmailAndPassword(auth, email, password); toggleAuthModal(); } catch (error) { alert('Đăng nhập thất bại: ' + error.message); } }
-async function handleSignup() { const email = document.getElementById('emailInput').value; const password = document.getElementById('passwordInput').value; if (!email || !password) return alert('Vui lòng nhập đủ thông tin.'); try { const userCredential = await createUserWithEmailAndPassword(auth, email, password); const user = userCredential.user; await setDoc(doc(db, "users", user.uid), { email: user.email, createdAt: new Date() }); alert('Đăng ký thành công!'); toggleAuthModal(); } catch (error) { alert('Đăng ký thất bại: ' + error.message); } }
+async function handleLogin() { const email = document.getElementById('emailInput').value; const password = document.getElementById('passwordInput').value; if (!email || !password) return showToast('Vui lòng nhập đủ thông tin.', 'warning'); try { await signInWithEmailAndPassword(auth, email, password); toggleAuthModal(); showToast('Đăng nhập thành công!', 'success'); } catch (error) { showToast('Đăng nhập thất bại: ' + error.message, 'error'); } }
+async function handleSignup() { const email = document.getElementById('emailInput').value; const password = document.getElementById('passwordInput').value; if (!email || !password) return showToast('Vui lòng nhập đủ thông tin.', 'warning'); try { const userCredential = await createUserWithEmailAndPassword(auth, email, password); const user = userCredential.user; await setDoc(doc(db, "users", user.uid), { email: user.email, createdAt: new Date(), quizSetsCreated: 0 }); showToast('Đăng ký thành công!', 'success'); toggleAuthModal(); } catch (error) { showToast('Đăng ký thất bại: ' + error.message, 'error'); } }
 async function handleFileSelect(e) { const file = e.target.files[0]; if (!file) return; fileNameElem.textContent = file.name; questionCountInfo.textContent = 'Đang phân tích...'; fileInfo.classList.remove('hidden'); processBtn.classList.add('hidden'); saveBtnPreQuiz.classList.add('hidden'); try { const parsedQuestions = await parseFile(file); if (parsedQuestions.length === 0) { questionCountInfo.textContent = 'Lỗi: Không tìm thấy câu hỏi.'; return; } const topics = parsedQuestions.map(q => q.topic); const uniqueTopics = new Set(topics); questions = parsedQuestions; currentQuizTitle = file.name.replace(/\.(xlsx|xls|csv)$/, ''); questionCountInfo.textContent = `✓ Tìm thấy ${questions.length} câu hỏi / ${uniqueTopics.size} chủ đề.`; processBtn.classList.remove('hidden'); saveBtnPreQuiz.classList.remove('hidden'); saveBtnPreQuiz.disabled = false; saveBtnPreQuiz.innerHTML = '<i class="fas fa-save mr-2"></i> Lưu vào thư viện'; } catch (error) { questionCountInfo.textContent = 'Lỗi! Không thể đọc file.'; console.error("Lỗi phân tích file:", error); } }
 function parseFile(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = function(e) { try { const data = new Uint8Array(e.target.result); const workbook = XLSX.read(data, { type: 'array' }); const firstSheet = workbook.Sheets[workbook.SheetNames[0]]; const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }); const parsedQuestions = jsonData.slice(1).map(row => { if (!row || !row[0] || String(row[0]).trim() === '') return null; return { question: row[0], answers: [row[1], row[2], row[3], row[4]].filter(ans => ans != null), correctAnswerIndex: parseInt(row[5], 10) - 1, explanation: row[7] || 'Không có giải thích.', topic: row[6] || 'Chung' }; }).filter(q => q !== null); resolve(parsedQuestions); } catch (error) { reject(error); } }; reader.onerror = reject; reader.readAsArrayBuffer(file); }); }
-async function saveAndStartQuiz() { const user = auth.currentUser; if (!user) { toggleAuthModal(); return; } if (questions.length === 0) return alert('Không có câu hỏi.'); processBtn.disabled = true; processBtn.innerHTML = 'Đang chuẩn bị...'; try { const docRef = await addDoc(collection(db, "quiz_sets"), { userId: user.uid, title: currentQuizTitle, questionCount: questions.length, questions: questions, createdAt: new Date() }); window.location.href = `quiz.html?id=${docRef.id}`; } catch (e) { alert('Lỗi khi lưu bộ đề.'); processBtn.disabled = false; processBtn.innerHTML = '<i class="fas fa-play-circle mr-2"></i> Bắt đầu'; console.error("Lỗi:", e); } }
-async function saveOnly() { const user = auth.currentUser; if (!user) { toggleAuthModal(); return; } if (questions.length === 0) return alert('Không có câu hỏi để lưu.'); saveBtnPreQuiz.disabled = true; saveBtnPreQuiz.innerHTML = 'Đang lưu...'; try { await addDoc(collection(db, "quiz_sets"), { userId: user.uid, title: currentQuizTitle, questionCount: questions.length, questions: questions, createdAt: new Date() }); alert(`Đã lưu "${currentQuizTitle}"!`); saveBtnPreQuiz.innerHTML = '✓ Đã lưu'; } catch (e) { saveBtnPreQuiz.disabled = false; saveBtnPreQuiz.innerHTML = 'Lưu'; alert('Lỗi khi lưu.'); } }
-async function loadAndDisplayLibrary() { const user = auth.currentUser; const quizListContainer = document.getElementById('quiz-list-container'); quizListContainer.innerHTML = `<div class="text-gray-500">Đang tải...</div>`; if (!user) { quizListContainer.innerHTML = '<p>Vui lòng <a href="#" id="login-link" class="text-[#FF69B4] underline">đăng nhập</a>.</p>'; document.getElementById('login-link').onclick = (e) => { e.preventDefault(); toggleAuthModal(); }; return; } try { const q = query(collection(db, "quiz_sets"), where("userId", "==", user.uid), orderBy("createdAt", "desc")); const querySnapshot = await getDocs(q); if (querySnapshot.empty) { quizListContainer.innerHTML = '<p class="text-gray-500">Thư viện trống!</p>'; return; } quizListContainer.innerHTML = ''; querySnapshot.forEach((doc) => { const quizSet = doc.data(); const card = document.createElement('div'); card.className = 'bg-white rounded-lg shadow-md p-4 flex flex-col'; card.innerHTML = ` <div class="flex-grow"><h3 class="text-md font-bold text-gray-700">${quizSet.title}</h3><p class="text-sm text-gray-500 mt-2">${quizSet.questionCount} câu hỏi</p><p class="text-xs text-gray-400 mt-1">Lưu ngày: ${new Date(quizSet.createdAt.toDate()).toLocaleDateString()}</div><div class="mt-4 flex flex-col gap-2"><a href="quiz.html?id=${doc.id}" class="w-full text-center px-4 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition text-sm">Bắt đầu</a><div class="flex gap-2"><button data-id="${doc.id}" data-title="${quizSet.title}" class="edit-quiz-btn w-1/2 text-center px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-xs">Sửa</button><button data-id="${doc.id}" class="delete-quiz-btn w-1/2 text-center px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition text-xs">Xóa</button></div></div>`; quizListContainer.appendChild(card); }); } catch (e) { console.error("Lỗi tải thư viện: ", e); quizListContainer.innerHTML = '<p class="text-red-500">Lỗi tải thư viện.</p>'; } }
-async function editQuizSetTitle(quizId, currentTitle) { const newTitle = prompt("Nhập tên mới cho bộ đề:", currentTitle); if (newTitle && newTitle.trim() !== '') { const docRef = doc(db, "quiz_sets", quizId); await updateDoc(docRef, { title: newTitle.trim() }); loadAndDisplayLibrary(); } }
+let currentQuizTitle = ''; // Biến này cần được khai báo ở đây
+
+// Hàm lưu và bắt đầu bài kiểm tra (quay lại như cũ)
+async function saveAndStartQuiz() {
+    const user = auth.currentUser;
+    if (!user) {
+        showToast('Vui lòng đăng nhập để lưu bộ đề.', 'info');
+        toggleAuthModal();
+        return;
+    }
+    if (questions.length === 0) return showToast('Không có câu hỏi để bắt đầu.', 'warning');
+    processBtn.disabled = true;
+    processBtn.innerHTML = 'Đang chuẩn bị...';
+
+    try {
+        const docRef = await addDoc(collection(db, "quiz_sets"), {
+            userId: user.uid,
+            title: currentQuizTitle,
+            questionCount: questions.length,
+            questions: questions,
+            createdAt: new Date()
+        });
+        await checkCreationAchievements(user.uid);
+        window.location.href = `quiz.html?id=${docRef.id}`;
+    } catch (e) {
+        showToast('Lỗi khi lưu bộ đề: ' + e.message, 'error');
+        processBtn.disabled = false;
+        processBtn.innerHTML = '<i class="fas fa-play-circle mr-2"></i> Bắt đầu';
+        console.error("Lỗi:", e);
+    }
+}
+
+// Hàm chỉ lưu (quay lại như cũ)
+async function saveOnly() {
+    const user = auth.currentUser;
+    if (!user) {
+        showToast('Vui lòng đăng nhập để lưu bộ đề.', 'info');
+        toggleAuthModal();
+        return;
+    }
+    if (questions.length === 0) return showToast('Không có câu hỏi để lưu.', 'warning');
+    saveBtnPreQuiz.disabled = true;
+    saveBtnPreQuiz.innerHTML = 'Đang lưu...';
+
+    try {
+        await addDoc(collection(db, "quiz_sets"), {
+            userId: user.uid,
+            title: currentQuizTitle,
+            questionCount: questions.length,
+            questions: questions,
+            createdAt: new Date()
+        });
+        await checkCreationAchievements(user.uid);
+        showToast(`Đã lưu "${currentQuizTitle}" vào thư viện!`, 'success');
+        saveBtnPreQuiz.innerHTML = '✓ Đã lưu';
+    } catch (e) {
+        saveBtnPreQuiz.disabled = false;
+        saveBtnPreQuiz.innerHTML = 'Lưu';
+        showToast('Lỗi khi lưu: ' + e.message, 'error');
+        console.error("Lỗi:", e);
+    }
+}
+
+// Hàm kiểm tra các thành tựu liên quan đến việc tạo bộ đề
+async function checkCreationAchievements(userId) {
+    const userRef = doc(db, "users", userId);
+    try {
+        await runTransaction(db, async (transaction) => {
+            const userDoc = await transaction.get(userRef);
+            if (!userDoc.exists()) {
+                throw "Tài liệu người dùng không tồn tại!";
+            }
+            const newCount = (userDoc.data().quizSetsCreated || 0) + 1;
+            transaction.update(userRef, { quizSetsCreated: newCount });
+
+            // Kiểm tra thành tựu dựa trên số lượng mới
+            if (newCount === 5) {
+                checkAndAwardAchievement(userId, 'COLLECTOR');
+            }
+        });
+    } catch (e) {
+        console.error("Lỗi giao dịch khi kiểm tra thành tựu: ", e);
+    }
+}
+
+// HÀM MỚI: Tải và hiển thị thư viện công cộng
+async function loadAndDisplayPublicLibrary() {
+    publicQuizListContainer.innerHTML = `<div class="text-gray-500">Đang tải các bộ đề công cộng...</div>`;
+    try {
+        // Truy vấn các bộ đề có isPublic là true
+        const q = query(collection(db, "quiz_sets"), where("isPublic", "==", true), orderBy("createdAt", "desc"), limit(20)); // Giới hạn 20 bộ đề gần nhất
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            publicQuizListContainer.innerHTML = '<p class="text-gray-500">Chưa có bộ đề công cộng nào được chia sẻ.</p>';
+            return;
+        }
+
+        publicQuizListContainer.innerHTML = '';
+        querySnapshot.forEach((doc) => {
+            const quizSet = doc.data();
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow-md p-4 flex flex-col';
+            card.innerHTML = `
+                <div class="flex-grow">
+                    <h3 class="text-md font-bold text-gray-700">${quizSet.title}</h3>
+                    <p class="text-sm text-gray-500 mt-2">${quizSet.questionCount} câu hỏi</p>
+                    <p class="text-xs text-gray-400 mt-1">Chia sẻ bởi: ${quizSet.userId}</p>
+                    <p class="text-xs text-gray-400 mt-1">Ngày: ${new Date(quizSet.createdAt.toDate()).toLocaleDateString()}</p>
+                </div>
+                <div class="mt-4 flex flex-col gap-2">
+                    <a href="quiz.html?id=${doc.id}" class="w-full text-center px-4 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition text-sm">Bắt đầu</a>
+                </div>
+            `;
+            publicQuizListContainer.appendChild(card);
+        });
+    } catch (e) {
+        console.error("Lỗi tải thư viện công cộng: ", e);
+        publicQuizListContainer.innerHTML = '<p class="text-red-500">Lỗi tải thư viện công cộng.</p>';
+    }
+}
+
+async function loadAndDisplayLibrary() {
+    const user = auth.currentUser;
+    const quizListContainer = document.getElementById('quiz-list-container');
+    quizListContainer.innerHTML = `<div class="text-gray-500">Đang tải...</div>`;
+
+    if (!user) {
+        quizListContainer.innerHTML = '<p>Vui lòng <a href="#" id="login-link" class="text-[#FF69B4] underline">đăng nhập</a>.</p>';
+        document.getElementById('login-link').onclick = (e) => { e.preventDefault(); toggleAuthModal(); };
+        return;
+    }
+
+    try {
+        const q = query(collection(db, "quiz_sets"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+
+        userQuizSets = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); // Giữ lại biến cache nhưng không dùng cho tìm kiếm
+        
+        renderLibrary(userQuizSets);
+
+    } catch (e) {
+        console.error("Lỗi tải thư viện: ", e);
+        quizListContainer.innerHTML = '<p class="text-red-500">Lỗi tải thư viện.</p>';
+    }
+}
+
+function renderLibrary(quizzesToDisplay) {
+    const quizListContainer = document.getElementById('quiz-list-container');
+    quizListContainer.innerHTML = '';
+
+    if (quizzesToDisplay.length === 0) {
+        quizListContainer.innerHTML = '<p class="text-gray-500">Không tìm thấy bộ đề nào khớp.</p>';
+        return;
+    }
+
+    quizzesToDisplay.forEach((quizSet) => {
+        const card = document.createElement('div');
+        card.className = 'bg-white rounded-lg shadow-md p-4 flex flex-col';
+        card.innerHTML = `
+            <div class="flex-grow">
+                <h3 class="text-md font-bold text-gray-700">${quizSet.title}</h3>
+                <p class="text-sm text-gray-500 mt-2">${quizSet.questionCount} câu hỏi</p>
+                <p class="text-xs text-gray-400 mt-1">Lưu ngày: ${new Date(quizSet.createdAt.toDate()).toLocaleDateString()}</p> 
+            </div>
+            <div class="mt-4 flex flex-col gap-2">
+                <a href="quiz.html?id=${quizSet.id}" class="w-full text-center px-4 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition text-sm">Bắt đầu</a>
+                <div class="flex gap-2">
+                    <button data-id="${quizSet.id}" data-title="${quizSet.title}" class="edit-quiz-btn w-1/2 text-center px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-xs">Sửa</button>
+                    <button data-id="${quizSet.id}" class="delete-quiz-btn w-1/2 text-center px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition text-xs">Xóa</button>
+                </div>
+            </div>
+        `;
+        quizListContainer.appendChild(card);
+    });
+}
 
 // CẬP NHẬT: Cải thiện hàm xóa với try-catch
 async function deleteQuizSet(quizId) {
     if (confirm("Bạn có chắc muốn xóa bộ đề này? Hành động này không thể hoàn tác.")) {
         try {
             await deleteDoc(doc(db, "quiz_sets", quizId));
-            alert("Đã xóa thành công!");
+            showToast("Đã xóa bộ đề thành công!", 'success');
             loadAndDisplayLibrary(); // Tải lại thư viện để cập nhật giao diện
         } catch (e) {
-            alert("Xóa thất bại! Lỗi: " + e.message);
+            showToast("Xóa thất bại! Lỗi: " + e.message, 'error');
             console.error("Lỗi khi xóa bộ đề: ", e);
         }
+    }
+}
+
+// Hàm sửa tên bộ đề (quay lại như cũ)
+async function editQuizSetTitle(quizId, currentTitle) {
+    const newTitle = prompt("Nhập tên mới cho bộ đề:", currentTitle);
+    if (newTitle && newTitle.trim() !== '') {
+        const docRef = doc(db, "quiz_sets", quizId);
+        await updateDoc(docRef, { title: newTitle.trim() });
+        showToast('Đã cập nhật tên bộ đề!', 'success');
+        loadAndDisplayLibrary();
     }
 }
 
@@ -104,7 +292,7 @@ function calculateGPA() {
     const y = parseInt(totalQuestionsInput.value, 10); // Tổng số câu
 
     if (isNaN(x) || isNaN(y) || y <= 0 || x < 0 || x > y) {
-        alert('Vui lòng nhập số câu hợp lệ!');
+        showToast('Vui lòng nhập số câu hợp lệ!', 'warning');
         return;
     }
 
@@ -127,7 +315,7 @@ function calculateGPA() {
     let score4, letterGrade, motivation, img;
 
     // ----- BƯỚC 2: QUY ĐỔI SANG ĐIỂM HỆ 4 VÀ ĐIỂM CHỮ THEO BẢNG -----
-    if (score10 >= 9.5) {
+     if (score10 >= 9.5) {
         score4 = 4.0;
         letterGrade = 'A+';
         img = 'assets/squirrel_A.png';
@@ -174,6 +362,7 @@ function calculateGPA() {
         motivation = "Hoi mò hoi mò, lần sau sẽ tốt hơn mà!";
     }
 
+
     // Hiển thị kết quả
     score10Text.textContent = score10.toFixed(2);
     score4Text.textContent = score4.toFixed(1);
@@ -197,27 +386,29 @@ async function loadAndDisplayStats() {
     statsContainer.innerHTML = '<h3 class="text-lg font-semibold p-6 text-gray-700">Lịch sử chi tiết</h3>';
 
     if (!user) {
-        achievementsContainer.innerHTML = '<p class="text-gray-500 col-span-full">Vui lòng đăng nhập để xem thống kê.</p>';
-        statsContainer.innerHTML += '<p class="text-gray-500 px-6 pb-6">Vui lòng đăng nhập để xem lịch sử.</p>';
+        achievementsContainer.innerHTML = '<p class="text-gray-500 col-span-full text-center">Vui lòng đăng nhập để xem thành tựu.</p>';
+        statsContainer.innerHTML += '<p class="text-gray-500 px-6 pb-6 text-center">Vui lòng đăng nhập để xem lịch sử.</p>';
         return;
     }
 
     try {
-        // CẬP NHẬT: Định nghĩa các thành tựu với tên và hình ảnh
-        const achievementsList = { 
-            'COLLECTOR': { 
-                name: 'Nhà Sưu Tầm', 
-                img: 'assets/achievement_collector.png' 
-            }, 
-            'GENIUS': { 
-                name: 'Siêu Trí Tuệ', 
-                img: 'assets/achievement_genius.png' 
-            }, 
-            'MARATHONER': { 
-                name: 'Marathon-er', 
-                img: 'assets/achievement_marathoner.png' 
-            } 
-        };
+        // CẬP NHẬT: Sử dụng đối tượng achievements đã được import
+        // Lấy danh sách tất cả các thành tựu có thể có
+        const allAchievements = Object.values(achievements);
+        
+        // Tạo các placeholder cho thành tựu
+        allAchievements.forEach(ach => {
+            const achievementEl = document.createElement('div');
+            achievementEl.className = 'flex flex-col items-center gap-2 opacity-50 grayscale'; // Mặc định mờ và xám
+            achievementEl.id = `achievement-${ach.name.replace(/\s/g, '-')}`; // Đặt ID để dễ cập nhật
+            achievementEl.innerHTML = `
+                <div class="bg-white p-2 rounded-lg shadow-md">
+                    <img src="${ach.img}" alt="${ach.name}" class="w-24 h-24 object-cover rounded-md">
+                </div>
+                <p class="font-semibold text-sm text-gray-700 mt-1">${ach.name}</p>
+            `;
+            achievementsContainer.appendChild(achievementEl);
+        });
 
         // Tải thành tựu người dùng đã mở khóa
         const achievementsQuery = query(collection(db, "users", user.uid, "achievements"));
@@ -228,18 +419,13 @@ async function loadAndDisplayStats() {
             achievementsContainer.innerHTML = '<p class="text-gray-500 col-span-full">Chưa có thành tựu nào được mở khóa.</p>';
         } else {
             achievementsSnapshot.forEach(doc => {
-                const achievementData = achievementsList[doc.id];
-                if (achievementData) {
-                    const achievementEl = document.createElement('div');
-                    // CẬP NHẬT: Tạo HTML để hiển thị hình ảnh và tên thành tựu
-                    achievementEl.className = 'flex flex-col items-center gap-2';
-                    achievementEl.innerHTML = `
-                        <div class="bg-white p-2 rounded-lg shadow-md">
-                            <img src="${achievementData.img}" alt="${achievementData.name}" class="w-24 h-24 object-cover rounded-md">
-                        </div>
-                        <p class="font-semibold text-sm text-gray-700 mt-1">${achievementData.name}</p>
-                    `;
-                    achievementsContainer.appendChild(achievementEl);
+                const unlockedAchievement = achievements[doc.id]; // Lấy từ đối tượng achievements chung
+                if (unlockedAchievement) {
+                    const targetEl = document.getElementById(`achievement-${unlockedAchievement.name.replace(/\s/g, '-')}`);
+                    if (targetEl) {
+                        targetEl.classList.remove('opacity-50', 'grayscale'); // Bỏ mờ và xám
+                        targetEl.classList.add('fade-in'); // Thêm hiệu ứng fade-in
+                    }
                 }
             });
         }
@@ -306,8 +492,8 @@ function setupEventListeners() {
     closeModalBtn.addEventListener('click', toggleAuthModal);
     loginBtn.addEventListener('click', handleLogin);
     signupBtn.addEventListener('click', handleSignup);
-    uploadArea.addEventListener('click', () => fileInput.click());
-    fileInput.addEventListener('change', handleFileSelect);
+    uploadArea.addEventListener('click', () => fileInput.click()); // Giữ nguyên
+    fileInput.addEventListener('change', handleFileSelect); // Giữ nguyên
     processBtn.addEventListener('click', saveAndStartQuiz);
     saveBtnPreQuiz.addEventListener('click', saveOnly);
     menuToggleBtn.addEventListener('click', () => sidebar.classList.toggle('hidden'));
@@ -328,6 +514,7 @@ function setupEventListeners() {
         const target = event.target.closest('button');
         if (!target) return;
         const quizId = target.getAttribute('data-id');
+        
         if (target.classList.contains('edit-quiz-btn')) {
             const currentTitle = target.getAttribute('data-title');
             editQuizSetTitle(quizId, currentTitle);
@@ -340,7 +527,10 @@ function setupEventListeners() {
     
     // CẬP NHẬT: Gán sự kiện cho nút refresh của trang thống kê
     const refreshStatsBtn = document.getElementById('refresh-stats-btn');
-    if(refreshStatsBtn) refreshStatsBtn.addEventListener('click', loadAndDisplayStats);
+    if (refreshStatsBtn) refreshStatsBtn.addEventListener('click', loadAndDisplayStats);
+
+    const refreshPublicLibraryBtn = document.getElementById('refresh-public-library-btn');
+    if (refreshPublicLibraryBtn) refreshPublicLibraryBtn.addEventListener('click', loadAndDisplayPublicLibrary);
 }
 
 // === KHỞI CHẠY ỨNG DỤNG ===

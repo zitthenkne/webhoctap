@@ -1,299 +1,46 @@
-/* Reset & Base Styles */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-:root {
-    --primary: #4f46e5;
-    --secondary: #10b981;
-    --text: #333;
-    --light-gray: #f3f4f6;
-    --medium-gray: #e5e7eb;
-    --dark-gray: #6b7280;
-}
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
 
 body {
-    background-color: #f9fafb;
-    color: var(--text);
-    line-height: 1.6;
-}
-
-/* Layout */
-.app-container {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-}
-
-.app-header, .app-footer {
-    background: white;
-    padding: 1rem 2rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    z-index: 10;
-}
-
-.app-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.logo {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 1.25rem;
-    font-weight: bold;
-}
-
-.main-content {
-    flex: 1;
-    padding: 2rem;
-    max-width: 800px;
-    margin: 0 auto;
-    width: 100%;
-}
-
-.app-footer {
-    text-align: center;
-    color: var(--dark-gray);
-    font-size: 0.9rem;
-}
-
-/* Components */
-.btn {
-    padding: 0.75rem 1.5rem;
-    border-radius: 0.375rem;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    border: 1px solid transparent;
-    font-size: 1rem;
-}
-
-.btn-primary {
-    background: var(--primary);
-    color: white;
-}
-
-.btn-primary:hover {
-    background: #4338ca;
-}
-
-.btn-success {
-    background: var(--secondary);
-    color: white;
-}
-
-.btn-success:hover {
-    background: #0f9d74;
-}
-
-.btn-secondary {
-    background: var(--medium-gray);
-    color: var(--text);
-}
-
-.btn-secondary:hover {
-    background: #d1d5db;
-}
-
-.btn-outline {
-    background: transparent;
-    border-color: var(--medium-gray);
-    color: var(--text);
-}
-
-.btn-outline:hover {
-    background-color: var(--light-gray);
-}
-
-.upload-card {
-    background: white;
-    padding: 3rem;
-    border-radius: 0.75rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    text-align: center;
-    max-width: 600px;
-    margin: 2rem auto;
-}
-
-.upload-card h2 {
-    margin-bottom: 0.5rem;
-}
-
-.upload-card p {
-    color: var(--dark-gray);
-    margin-bottom: 1.5rem;
-}
-
-.upload-icon {
-    font-size: 3rem;
-    color: var(--primary);
-    margin-bottom: 1rem;
-}
-
-#fileInfo {
-    margin-top: 1.5rem;
-    background-color: var(--light-gray);
-    padding: 1rem;
-    border-radius: 0.5rem;
-}
-
-#fileInfo p {
-    margin: 0 0 1rem 0;
-    color: var(--secondary);
-    font-weight: 500;
-}
-
-/* Quiz Section */
-#quizSection {
-    background: white;
-    border-radius: 0.75rem;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    padding: 2rem;
-}
-
-.quiz-header {
-    text-align: center;
-    margin-bottom: 2rem;
+    font-family: 'Quicksand', sans-serif;
+    /* Màu nền đã được Tailwind xử lý, nhưng giữ lại làm màu cơ bản */
+    background-color: #FCE4EC; 
 }
 
 .progress-bar {
-    height: 0.5rem;
-    background: var(--light-gray);
+    height: 0.75rem;
+    background: #FFB6C1;
     border-radius: 999px;
-    margin: 0.5rem 0;
+    margin: 1rem 0;
     overflow: hidden;
 }
 
 #progressFill {
     height: 100%;
-    background: var(--primary);
+    background: #FF69B4;
     border-radius: 999px;
     width: 0%;
     transition: width 0.3s ease;
 }
 
-#progressText {
-    color: var(--dark-gray);
-    font-size: 0.9rem;
-}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-.question-card h3 {
-    margin-bottom: 1.5rem;
-    font-size: 1.5rem;
-    line-height: 1.4;
-}
+/* Hợp nhất animation để có hiệu ứng đồng nhất trên toàn trang */
+.fade-in { animation: fadeIn 0.5s ease-out forwards; }
 
-.answers {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 0.75rem;
-}
-
-.answer-btn {
-    display: block;
-    width: 100%;
-    padding: 1rem;
-    text-align: left;
-    background-color: var(--light-gray);
-    border: 1px solid var(--medium-gray);
-    border-radius: 0.5rem;
-    cursor: pointer;
-    transition: background-color 0.2s, border-color 0.2s;
-}
-
-.answer-btn:hover {
-    background-color: #e0e7ff;
-    border-color: var(--primary);
-}
-
-.quiz-actions {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 2rem;
-    padding-top: 1rem;
-    border-top: 1px solid var(--medium-gray);
-}
-
-/* Modal */
-.modal {
+/* Toast Notifications */
+#toast-container {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0,0,0,0.5);
-    display: flex;
-    justify-content: center;
-    align-items: center;
+    top: 20px;
+    right: 20px;
     z-index: 1000;
-    opacity: 1;
-    transition: opacity 0.3s ease;
-}
-
-.modal.hidden {
-    opacity: 0;
-    pointer-events: none;
-}
-
-.modal-content {
-    background: white;
-    padding: 2rem;
-    border-radius: 0.5rem;
-    width: 90%;
-    max-width: 400px;
-    position: relative;
     display: flex;
     flex-direction: column;
-    gap: 1rem;
+    align-items: flex-end;
 }
 
-.close-modal {
-    position: absolute;
-    top: 10px;
-    right: 15px;
-    font-size: 1.5rem;
-    cursor: pointer;
-    color: var(--dark-gray);
+.toast-notification {
+    min-width: 250px;
+    max-width: 350px;
+    box-sizing: border-box;
 }
-
-.modal-content h2 {
-    text-align: center;
-}
-
-.modal-content input {
-    width: 100%;
-    padding: 0.75rem;
-    border: 1px solid var(--medium-gray);
-    border-radius: 0.375rem;
-    font-size: 1rem;
-}
-
-.hidden {
-    display: none !important;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .app-header, .main-content, .app-footer {
-        padding: 1rem;
-    }
-    
-    .quiz-actions {
-        flex-direction: column-reverse;
-        gap: 0.5rem;
-    }
-
-    .btn {
-        width: 100%;
-        justify-content: center;
-    }
-}
+.fade-in { animation: fadeIn 0.5s ease-out forwards; }
