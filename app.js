@@ -131,32 +131,32 @@ function calculateGPA() {
         score4 = 4.0;
         letterGrade = 'A+';
         img = 'assets/squirrel_A.png';
-        motivation = "Xuất sắc! Điểm số thật đáng ngưỡng mộ!";
+        motivation = "Ối dồi ôi, ối dồi ôi, trình là j mà là trình ai chấm!!! Anh chỉ biết làm ba mẹ anh tự hào, xây căn nhà thật to ở 1 mình 2 tấm";
     } else if (score10 >= 8.5) {
         score4 = 4.0;
         letterGrade = 'A';
         img = 'assets/squirrel_A.png';
-        motivation = "Giỏi quá! Một kết quả tuyệt vời!";
+        motivation = "Dỏi dữ dị bà, trộm día trộm díaaaaaa, xin vía 4.0 <3";
     } else if (score10 >= 8.0) {
         score4 = 3.5;
         letterGrade = 'B+';
         img = 'assets/squirrel_B.png';
-        motivation = "Rất tốt! Bạn đang làm rất tốt!";
+        motivation = "gút chóp bây bề";
     } else if (score10 >= 7.0) {
         score4 = 3.0;
         letterGrade = 'B';
         img = 'assets/squirrel_B.png';
-        motivation = "Khá lắm! Tiếp tục phát huy nhé!";
+        motivation = "Quaooooooo, vá là dỏi òiiiiii";
     } else if (score10 >= 6.5) {
         score4 = 2.5;
         letterGrade = 'C+';
         img = 'assets/squirrel_C.png';
-        motivation = "Ổn rồi! Một số điểm an toàn.";
+        motivation = "Điểm này là cũng cũng ròi á mom, u so gud babi";
     } else if (score10 >= 5.5) {
         score4 = 2.0;
         letterGrade = 'C';
         img = 'assets/squirrel_C.png';
-        motivation = "Cũng được! Cố gắng hơn ở lần sau nhé.";
+        motivation = "Cũn cũn ik, cố gắng lên nhennn";
     } else if (score10 >= 5.0) {
         score4 = 1.5;
         letterGrade = 'D+';
@@ -166,12 +166,12 @@ function calculateGPA() {
         score4 = 1.0;
         letterGrade = 'D';
         img = 'assets/squirrel_D.png';
-        motivation = "Qua môn rồi! Chúc mừng nhé!";
+        motivation = "Qua môn rồi! Chúc mừng nha bàaaaa";
     } else { // Dưới 4.0
         score4 = 0.0;
         letterGrade = 'F';
         img = 'assets/squirrel_F.png';
-        motivation = "Đừng buồn, lần sau sẽ tốt hơn mà!";
+        motivation = "Hoi mò hoi mò, lần sau sẽ tốt hơn mà!";
     }
 
     // Hiển thị kết quả
