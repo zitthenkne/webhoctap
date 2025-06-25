@@ -89,6 +89,7 @@ async function deleteQuizSet(quizId) {
 
 function downloadTemplate() { const sampleData = [ ['Nội dung câu hỏi', 'Đáp án 1', 'Đáp án 2', 'Đáp án 3', 'Đáp án 4', 'Đáp án đúng (Điền số 1,2,3,4)', 'Chủ đề', 'Giải thích'], ['Thủ đô của Việt Nam là gì?', 'TP. Hồ Chí Minh', 'Đà Nẵng', 'Hà Nội', 'Hải Phòng', 3, 'Địa lý', 'Hà Nội là thủ đô của nước CHXHCN Việt Nam.'] ]; const worksheet = XLSX.utils.aoa_to_sheet(sampleData); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, "Zitthenkne Mau"); worksheet['!cols'] = [ {wch: 50}, {wch: 25}, {wch: 25}, {wch: 25}, {wch: 25}, {wch: 30}, {wch: 25}, {wch: 50} ]; XLSX.writeFile(workbook, "Zitthenkne_File_Mau.xlsx"); }
 // HÀM calculateGPA - PHIÊN BẢN HOÀN CHỈNH
+// HÀM calculateGPA - PHIÊN BẢN CẬP NHẬT THEO CÔNG THỨC MỚI
 function calculateGPA() {
     const correctAnswersInput = document.getElementById('correct-answers');
     const totalQuestionsInput = document.getElementById('total-questions');
@@ -99,45 +100,81 @@ function calculateGPA() {
     const motivationText = document.getElementById('gpa-motivation-text');
     const squirrelImg = document.getElementById('gpa-squirrel-img');
 
-    const correct = parseInt(correctAnswersInput.value, 10);
-    const total = parseInt(totalQuestionsInput.value, 10);
+    const x = parseInt(correctAnswersInput.value, 10); // Số câu đúng
+    const y = parseInt(totalQuestionsInput.value, 10); // Tổng số câu
 
-    if (isNaN(correct) || isNaN(total) || total <= 0 || correct < 0 || correct > total) {
+    if (isNaN(x) || isNaN(y) || y <= 0 || x < 0 || x > y) {
         alert('Vui lòng nhập số câu hợp lệ!');
         return;
     }
 
-    const score10 = (correct / total) * 10;
-    let score4, letterGrade, motivation, img;
+    const n = x / y;
+    let score10;
 
-    // SỬA LẠI TÊN FILE DÙNG DẤU GẠCH DƯỚI "_"
-    if (score10 >= 8.5) { // A, A+
-        score4 = (score10 >= 9.0) ? 4.0 : 3.7;
-        letterGrade = (score10 >= 9.0) ? 'A+' : 'A';
-        motivation = "Trộm día trộm día! Cho tui xin vía nha bà ơi, tui iu 4.0, 4.0 hãy đến với tuiii";
-        img = 'assets/squirrel_A.png'; // Đã sửa
-    } else if (score10 >= 7.0) { // B, B+
-        score4 = (score10 >= 8.0) ? 3.5 : 3.0;
-        letterGrade = (score10 >= 8.0) ? 'B+' : 'B';
-        motivation = "Adu, dỏi dữ dị bà nọi!";
-        img = 'assets/squirrel_B.png'; // Đã sửa
-    } else if (score10 >= 5.5) { // C, C+
-        score4 = (score10 >= 6.5) ? 2.5 : 2.0;
-        letterGrade = (score10 >= 6.5) ? 'C+' : 'C';
-        motivation = "Oke dòi, điểm nài là ổn dòi, chill hoiiii";
-        img = 'assets/squirrel_C.png'; // Đã sửa
-    } else if (score10 >= 4.0) { // D, D+
-        score4 = (score10 >= 5.0) ? 1.5 : 1.0;
-        letterGrade = (score10 >= 5.0) ? 'D+' : 'D';
-        motivation = "Qua môn!!! Chin chúc mừng, lần sau cố gắng hơn nà đựt hàaa";
-        img = 'assets/squirrel_D.png'; // Đã sửa
-    } else { // F
-        score4 = 0.0;
-        letterGrade = 'F';
-        motivation = "Cố lên bà ưi, lần sau chắc chắn sẽ được màaaa!";
-        img = 'assets/squirrel_F.png'; // Đã sửa
+    // ----- BƯỚC 1: TÍNH ĐIỂM HỆ 10 THEO CÔNG THỨC 5 TRƯỜNG HỢP -----
+    if (n < 0.5) {
+        score10 = (8 * x) / y;
+    } else if (n === 0.5) {
+        score10 = 4.0;
+    } else if (n > 0.5 && n < 0.6) {
+        score10 = 4 + (10 * (x - 0.5 * y)) / y;
+    } else if (n === 0.6) {
+        score10 = 5.0;
+    } else { // n > 0.6
+        score10 = 5 + (12.5 * (x - 0.6 * y)) / y;
     }
 
+    let score4, letterGrade, motivation, img;
+
+    // ----- BƯỚC 2: QUY ĐỔI SANG ĐIỂM HỆ 4 VÀ ĐIỂM CHỮ THEO BẢNG -----
+    if (score10 >= 9.5) {
+        score4 = 4.0;
+        letterGrade = 'A+';
+        img = 'assets/squirrel_A.png';
+        motivation = "Xuất sắc! Điểm số thật đáng ngưỡng mộ!";
+    } else if (score10 >= 8.5) {
+        score4 = 4.0;
+        letterGrade = 'A';
+        img = 'assets/squirrel_A.png';
+        motivation = "Giỏi quá! Một kết quả tuyệt vời!";
+    } else if (score10 >= 8.0) {
+        score4 = 3.5;
+        letterGrade = 'B+';
+        img = 'assets/squirrel_B.png';
+        motivation = "Rất tốt! Bạn đang làm rất tốt!";
+    } else if (score10 >= 7.0) {
+        score4 = 3.0;
+        letterGrade = 'B';
+        img = 'assets/squirrel_B.png';
+        motivation = "Khá lắm! Tiếp tục phát huy nhé!";
+    } else if (score10 >= 6.5) {
+        score4 = 2.5;
+        letterGrade = 'C+';
+        img = 'assets/squirrel_C.png';
+        motivation = "Ổn rồi! Một số điểm an toàn.";
+    } else if (score10 >= 5.5) {
+        score4 = 2.0;
+        letterGrade = 'C';
+        img = 'assets/squirrel_C.png';
+        motivation = "Cũng được! Cố gắng hơn ở lần sau nhé.";
+    } else if (score10 >= 5.0) {
+        score4 = 1.5;
+        letterGrade = 'D+';
+        img = 'assets/squirrel_D.png';
+        motivation = "Vừa đủ qua. Cần xem lại kiến thức một chút.";
+    } else if (score10 >= 4.0) {
+        score4 = 1.0;
+        letterGrade = 'D';
+        img = 'assets/squirrel_D.png';
+        motivation = "Qua môn rồi! Chúc mừng nhé!";
+    } else { // Dưới 4.0
+        score4 = 0.0;
+        letterGrade = 'F';
+        img = 'assets/squirrel_F.png';
+        motivation = "Đừng buồn, lần sau sẽ tốt hơn mà!";
+    }
+
+    // Hiển thị kết quả
     score10Text.textContent = score10.toFixed(2);
     score4Text.textContent = score4.toFixed(1);
     letterGradeText.textContent = letterGrade;
