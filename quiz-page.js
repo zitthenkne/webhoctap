@@ -28,7 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let flashcardQuestions = [];     // Bộ câu hỏi đang hiển thị (lượt đầu hoặc ôn tập)
     let reviewQueue = [];            // Các câu hỏi được đánh dấu "chưa thuộc" trong lượt hiện tại
     let currentFlashcardIndex = 0;   // Vị trí thẻ hiện tại cho chế độ Flashcard
-    
+    // === NÂNG CẤP CHẾ ĐỘ ĐÁNH ĐỀ ===
+    // Thêm biến trạng thái cho đánh dấu câu hỏi
+    let markedQuestions = [];
+
     // Hàm tải dữ liệu bộ đề từ Firestore dựa vào ID trên URL
     async function loadQuizData() {
         const urlParams = new URLSearchParams(window.location.search);
@@ -109,8 +112,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderFlashcards() {
         flashcardContainer.innerHTML = `
             <div class="flashcard-viewer mx-auto max-w-2xl">
+                <!-- Progress bar for flashcard session -->
+                <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden mb-4">
+                    <div id="flashcard-progress-bar" class="h-full bg-[#FF69B4] transition-all duration-300" style="width:0%"></div>
+                </div>
+                <!-- Known/Unknown counter -->
+                <div class="flex justify-between items-center mb-2 text-sm text-gray-600">
+                    <span id="flashcard-known-count"></span>
+                    <span id="flashcard-unknown-count"></span>
+                </div>
                 <div id="flashcard" class="flashcard-scene" title="Nhấn để lật thẻ (hoặc dùng phím Space)">
-                    <div class="flashcard-inner">
+                    <div class="flashcard-inner transition-transform duration-500">
                         <div id="flashcard-front" class="flashcard-face flashcard-front"></div>
                         <div id="flashcard-back" class="flashcard-face flashcard-back"></div>
                     </div>
@@ -160,6 +172,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     <button id="restart-all-flashcards-btn" class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition">
                         <i class="fas fa-redo"></i> Học lại từ đầu
                     </button>
+                    <button id="review-unknown-btn" class="px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition">
+                        <i class="fas fa-undo"></i> Xem lại thẻ chưa thuộc
+                    </button>
                     <button id="exit-flashcard-final-btn" class="px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition">
                         <i class="fas fa-times-circle"></i> Thoát
                     </button>
@@ -204,9 +219,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         front.innerHTML = `<p class="text-2xl font-semibold">${cardData.question}</p>`;
         
-        const correctAnswer = cardData.answers[cardData.correctAnswerIndex];
+        // FIX: Handle both 'answers' and legacy 'options' properties for backward compatibility.
+        const answerOptions = cardData.answers || cardData.options;
+        if (!answerOptions || cardData.correctAnswerIndex === undefined || cardData.correctAnswerIndex === null) {
+            back.innerHTML = `<p class="text-red-500">Lỗi dữ liệu thẻ.</p>`;
+            progress.textContent = `Thẻ ${index + 1} / ${flashcardQuestions.length}`;
+            return;
+        }
+        const correctAnswer = answerOptions[cardData.correctAnswerIndex];
         back.innerHTML = `
-            <h4 class="font-bold text-xl text-green-600 mb-4">Đáp án: ${correctAnswer}</h4>
+            <h4 class="font-bold text-xl text-green-600 mb-4">Đáp án: ${correctAnswer || 'N/A'}</h4>
             <p class="text-gray-700">${cardData.explanation || 'Không có giải thích.'}</p>
         `;
 
@@ -215,10 +237,25 @@ document.addEventListener('DOMContentLoaded', () => {
         // Vô hiệu hóa nút nếu ở đầu hoặc cuối danh sách
         document.getElementById('prev-card-btn').disabled = index === 0;
         document.getElementById('next-card-btn').disabled = index === flashcardQuestions.length - 1;
+
+        updateFlashcardProgress();
     }
 
     // === CÁC HÀM HỖ TRỢ FLASHCARD ===
     let isCardFlipped = false; // Track if the current card is flipped
+
+    // Cập nhật progress bar và bộ đếm known/unknown khi chuyển thẻ
+    function updateFlashcardProgress() {
+        const progressBar = document.getElementById('flashcard-progress-bar');
+        const knownCount = _allFlashcardQuestions.filter(q => q._isKnown).length;
+        const unknownCount = _allFlashcardQuestions.length - knownCount;
+        const knownSpan = document.getElementById('flashcard-known-count');
+        const unknownSpan = document.getElementById('flashcard-unknown-count');
+        const percent = _allFlashcardQuestions.length > 0 ? (knownCount / _allFlashcardQuestions.length) * 100 : 0;
+        if (progressBar) progressBar.style.width = percent + '%';
+        if (knownSpan) knownSpan.textContent = `Đã thuộc: ${knownCount}`;
+        if (unknownSpan) unknownSpan.textContent = `Chưa thuộc: ${unknownCount}`;
+    }
 
     // Lật thẻ và hiển thị/ẩn các nút đánh dấu
     function flipCard() {
@@ -260,6 +297,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!isKnown && !reviewQueue.includes(currentCard)) {
             reviewQueue.push(currentCard);
         }
+
+        updateFlashcardProgress();
 
         moveToNextFlashcard(true); // Marked, so move to next
     }
@@ -408,275 +447,384 @@ document.addEventListener('DOMContentLoaded', () => {
         showQuestion();
     }
 
+    function renderQuizProgressBar() {
+        // Thêm progress bar và navigator vào quizSection
+        const answeredCount = userAnswers.filter(a => a !== null).length;
+        const total = questions.length;
+        const percent = total > 0 ? Math.round((answeredCount / total) * 100) : 0;
+        let navHtml = '';
+        for (let i = 0; i < total; i++) {
+            const isAnswered = userAnswers[i] !== null;
+            const isMarked = markedQuestions.includes(i);
+            navHtml += `<button class="quiz-nav-btn ${i === currentIndex ? 'bg-[#FF69B4] text-white' : isAnswered ? 'bg-green-100' : 'bg-gray-100'} ${isMarked ? 'border-2 border-yellow-400' : ''} rounded-full w-8 h-8 mx-1 my-1 text-sm font-bold focus:outline-none" data-qidx="${i}" title="Câu ${i+1}${isMarked ? ' (Đánh dấu)' : ''}">${i+1}</button>`;
+        }
+        return `
+            <div class="mb-4">
+                <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden mb-2">
+                    <div class="h-full bg-[#FF69B4] transition-all duration-300" style="width:${percent}%"></div>
+                </div>
+                <div class="flex justify-between items-center text-xs text-gray-600 mb-2">
+                    <span>Đã trả lời: ${answeredCount}/${total}</span>
+                    <span>Còn lại: ${total - answeredCount}</span>
+                </div>
+                <div class="flex flex-wrap justify-center">${navHtml}</div>
+            </div>
+        `;
+    }
+
     function showQuestion() {
         updateProgressBar();
         const question = questions[currentIndex];
+
+        // Safeguard against corrupted or incomplete question data
+        if (!question || !question.question) {
+            quizSection.innerHTML = `<p class="text-red-500 text-center p-6">Lỗi: Không thể tải dữ liệu câu hỏi. Dữ liệu có thể bị hỏng.</p>`;
+            console.error("Invalid question object at index:", currentIndex, questions);
+            return;
+        }
+
+        // FIX: Handle both 'answers' and legacy 'options' properties for backward compatibility.
+        const answerOptions = question.answers || question.options;
+        if (!answerOptions || !Array.isArray(answerOptions)) {
+            quizSection.innerHTML = `<p class="text-red-500 text-center p-6">Lỗi: Câu hỏi này không có đáp án. Dữ liệu có thể bị hỏng.</p>`;
+            console.error("Question object is missing 'answers' or 'options' array:", question);
+            return;
+        }
+
         let title = quizMode === 'practice' ? 'Luyện tập lại' : `Câu hỏi ${currentIndex + 1}`;
-
         quizSection.innerHTML = `
-            <div class="bg-white rounded-lg shadow-lg p-6 fade-in">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold text-gray-700">${title}</h2>
-                    <div id="timer" class="text-lg font-semibold text-[#FF69B4]">00:00</div>
-                </div>
-                <h3 class="text-2xl font-semibold text-gray-800 my-6 text-center">${question.question}</h3>
-                <div id="answers-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    ${question.answers.map((answer, index) => `
-                        <button class="answer-btn p-4 border border-pink-200 rounded-lg text-left hover:bg-[#FFB6C1]/50 hover:border-[#FF69B4] transition" data-index="${index}">
-                            ${answer}
-                        </button>
-                    `).join('')}
-                </div>
-                <div id="explanation-area" class="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded hidden">
-                    <h4 class="font-bold text-yellow-800">Giải thích</h4>
-                    <p class="text-yellow-700 mt-1">${question.explanation || 'Không có giải thích.'}</p>
-                </div>
-                <div class="mt-8 flex justify-between">
-                    <button id="prevBtn" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition ${currentIndex === 0 || quizMode === 'practice' ? 'invisible' : ''}">
-                        Câu trước
+        ${renderQuizProgressBar()}
+        <div class="bg-white rounded-lg shadow-lg p-6 fade-in">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-700">${title}</h2>
+                <div id="timer" class="text-lg font-semibold text-[#FF69B4]">00:00</div>
+            </div>
+            <h3 class="text-2xl font-semibold text-gray-800 my-6 text-center">${question.question}</h3>
+            <div id="answers-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                ${answerOptions.map((answer, index) => `
+                    <button class="answer-btn p-4 border border-pink-200 rounded-lg text-left hover:bg-[#FFB6C1]/50 hover:border-[#FF69B4] transition" data-index="${index}">
+                        ${answer}
                     </button>
-                    <button id="nextBtn" class="px-6 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition hidden">
-                        ${currentIndex === questions.length - 1 ? 'Xem kết quả' : 'Câu tiếp'} <i class="fas fa-arrow-right ml-2"></i>
-                    </button>
+                `).join('')}
+            </div>
+            <div class="mt-4 flex flex-wrap justify-end gap-2">
+                <button id="mark-question-btn" class="px-4 py-2 rounded-lg border border-yellow-400 text-yellow-700 bg-yellow-50 hover:bg-yellow-100 transition flex items-center gap-2">
+                    <i class="fas fa-flag"></i> ${markedQuestions.includes(currentIndex) ? 'Bỏ đánh dấu' : 'Đánh dấu câu này'}
+                </button>
+                <button id="review-marked-btn" class="px-4 py-2 rounded-lg border border-blue-400 text-blue-700 bg-blue-50 hover:bg-blue-100 transition flex items-center gap-2 ${markedQuestions.length === 0 ? 'hidden' : ''}">
+                    <i class="fas fa-eye"></i> Xem các câu đã đánh dấu
+                </button>
+            </div>
+            <div id="explanation-area" class="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded hidden">
+                <h4 class="font-bold text-yellow-800">Giải thích</h4>
+                <p class="text-yellow-700 mt-1">${question.explanation || 'Không có giải thích.'}</p>
+            </div>
+            <div class="mt-8 flex justify-between">
+                <button id="prevBtn" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition ${currentIndex === 0 || quizMode === 'practice' ? 'invisible' : ''}">
+                    Câu trước
+                </button>
+                <button id="nextBtn" class="px-6 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition hidden">
+                    ${currentIndex === questions.length - 1 ? 'Xem kết quả' : 'Câu tiếp'} <i class="fas fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    document.querySelectorAll('.answer-btn').forEach(button => {
+        button.addEventListener('click', handleAnswerClick);
+    });
+    if (quizMode === 'normal' && currentIndex > 0) {
+        document.getElementById('prevBtn').addEventListener('click', showPreviousQuestion);
+    }
+    // Đánh dấu câu hỏi
+    document.getElementById('mark-question-btn').addEventListener('click', () => {
+        if (markedQuestions.includes(currentIndex)) {
+            markedQuestions = markedQuestions.filter(i => i !== currentIndex);
+        } else {
+            markedQuestions.push(currentIndex);
+        }
+        showQuestion();
+    });
+    // Navigator chuyển nhanh câu hỏi
+    document.querySelectorAll('.quiz-nav-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.target.getAttribute('data-qidx'));
+            if (!isNaN(idx)) {
+                currentIndex = idx;
+                showQuestion();
+            }
+        });
+    });
+    // Xem lại các câu đã đánh dấu
+    const reviewMarkedBtn = document.getElementById('review-marked-btn');
+    if (reviewMarkedBtn) {
+        reviewMarkedBtn.addEventListener('click', () => {
+            if (markedQuestions.length > 0) {
+                currentIndex = markedQuestions[0];
+                showQuestion();
+            }
+        });
+    }
+}
+
+// === CHUYỂN VỀ CÂU HỎI TRƯỚC ===
+function showPreviousQuestion() {
+    if (currentIndex > 0) {
+        currentIndex--;
+        showQuestion();
+    }
+}
+
+// === KẾT THÚC BÀI KIỂM TRA ===
+function endQuiz() {
+    // Tính thời gian làm bài
+    let totalTime = 0;
+    if (quizStartTime) {
+        totalTime = Math.floor((new Date() - quizStartTime) / 1000);
+    }
+    // Dừng timer
+    if (quizTimerInterval) clearInterval(quizTimerInterval);
+    // Hiện kết quả
+    showResults(totalTime);
+    // Lưu kết quả nếu là chế độ thường
+    if (quizMode === 'normal') {
+        const percentage = questions.length > 0 ? (score / questions.length) * 100 : 0;
+        saveQuizResult(score, questions.length, percentage, totalTime);
+    }
+    // Ẩn phần quiz, hiện phần kết quả
+    quizSection.classList.add('hidden');
+    resultsSection.classList.remove('hidden');
+}
+
+// Xác nhận khi nộp bài nếu còn câu chưa trả lời hoặc còn câu đã đánh dấu
+function showNextQuestion() {
+    if (currentIndex < questions.length - 1) {
+        currentIndex++;
+        showQuestion();
+    } else {
+        const unanswered = userAnswers.filter(a => a === null).length;
+        if (unanswered > 0 || markedQuestions.length > 0) {
+            if (!confirm(`Bạn còn ${unanswered} câu chưa trả lời và ${markedQuestions.length} câu đã đánh dấu. Bạn chắc chắn muốn nộp bài?`)) {
+                return;
+            }
+        }
+        endQuiz();
+    }
+}
+
+// Hiển thị danh sách các câu đã đánh dấu/câu chưa trả lời ở cuối bài
+function showResults(totalTime) {
+    resultsSection.classList.remove('hidden');
+    const percentage = questions.length > 0 ? ((score / questions.length) * 100).toFixed(1) : 0;
+    const showPracticeButton = score < questions.length;
+    const unansweredList = questions.map((q, i) => userAnswers[i] === null ? i+1 : null).filter(x => x !== null);
+    const markedList = markedQuestions.map(i => i+1);
+
+    const detailedResultsHtml = questions.map((q, index) => {
+        const userAnswerIndex = userAnswers[index];
+        const isCorrect = userAnswerIndex === q.correctAnswerIndex;
+
+        // FIX: Handle both 'answers' and legacy 'options' properties for backward compatibility.
+        const answerOptions = q.answers || q.options;
+        if (!answerOptions || !Array.isArray(answerOptions)) {
+            return `<div class="mb-8 p-6 rounded-lg bg-red-50 border border-red-200">
+                        <h4 class="text-lg font-semibold text-gray-800">Câu ${index + 1}: ${q.question || 'Câu hỏi bị lỗi'}</h4>
+                        <p class="text-red-600 mt-2">Lỗi: Không thể hiển thị chi tiết do dữ liệu đáp án bị lỗi.</p>
+                    </div>`;
+        }
+
+        const userAnswerText = userAnswerIndex !== null ? answerOptions[userAnswerIndex] : 'Chưa trả lời';
+        const correctAnswerText = answerOptions[q.correctAnswerIndex];
+
+        return `
+            <div class="mb-8 p-6 rounded-lg ${isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
+                <div class="flex items-center mb-3">
+                    ${isCorrect ? 
+                        '<i class="fas fa-check-circle text-green-500 text-xl mr-3"></i>' : 
+                        '<i class="fas fa-times-circle text-red-500 text-xl mr-3"></i>'
+                    }
+                    <h4 class="text-lg font-semibold text-gray-800">Câu ${index + 1}: ${q.question}</h4>
+                </div>
+                <div class="ml-8">
+                    <p class="text-gray-700 mb-2">
+                        <span class="font-medium">Câu trả lời của bạn:</span> 
+                        <span class="${isCorrect ? 'text-green-600' : 'text-red-600'}">${userAnswerText}</span>
+                        ${!isCorrect && userAnswerIndex !== null ? `<i class="fas fa-times ml-1"></i>` : ''}
+                    </p>
+                    <p class="text-gray-700 mb-2">
+                        <span class="font-medium">Đáp án đúng:</span> 
+                        <span class="text-green-600">${correctAnswerText}</span> <i class="fas fa-check ml-1"></i>
+                    </p>
+                    <div class="mt-4 p-3 bg-gray-100 rounded-md">
+                        <h5 class="font-bold text-gray-800">Giải thích:</h5>
+                        <p class="text-gray-700">${q.explanation || 'Không có giải thích.'}</p>
+                    </div>
                 </div>
             </div>
         `;
+    }).join('');
 
-        document.querySelectorAll('.answer-btn').forEach(button => {
-            button.addEventListener('click', handleAnswerClick);
-        });
+    resultsSection.innerHTML = `
+        <div class="bg-white rounded-lg shadow-lg p-8 text-center fade-in">
+            <h2 class="text-3xl font-bold text-[#FF69B4]">Hoàn thành!</h2>
+            <p class="text-gray-600 mt-2">Đây là kết quả của bạn:</p>
+            <div class="my-8">
+                <p class="text-5xl font-bold text-[#FF69B4]">${percentage}%</p>
+                <p class="text-lg text-gray-700 mt-2">Đúng ${score}/${questions.length} câu</p>
+                <p class="text-sm text-gray-500 mt-1">Bạn đã trả lời ${questions.length - userAnswers.filter(a => a === null).length} / ${questions.length} câu</p>
+            </div>
+            <div class="text-md text-gray-500">
+                <i class="fas fa-clock mr-2"></i> Thời gian: ${formatTime(totalTime)}
+            </div>
+            <div class="mt-4 text-left">
+                ${unansweredList.length > 0 ? `<div class="mb-2"><span class="font-bold text-red-500">Câu chưa trả lời:</span> ${unansweredList.join(', ')}</div>` : ''}
+                ${markedList.length > 0 ? `<div><span class="font-bold text-yellow-600">Câu đã đánh dấu:</span> ${markedList.join(', ')}</div>` : ''}
+            </div>
+            <div class="mt-8 flex justify-center flex-wrap gap-4">
+                <button id="restartQuizBtn" class="px-6 py-3 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition">
+                    <i class="fas fa-redo mr-2"></i> Làm lại
+                </button>
+                ${showPracticeButton ? `
+                    <button id="practiceIncorrectBtn" class="px-6 py-3 bg-orange-400 text-white rounded-lg hover:bg-orange-500 transition">
+                        <i class="fas fa-pencil-alt mr-2"></i> Luyện tập câu sai
+                    </button>` : ''}
+                <a href="index.html" class="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition">
+                    <i class="fas fa-home mr-2"></i> Về trang chủ
+                </a>
+            </div>
+        </div>
+        <div class="bg-white rounded-lg shadow-lg p-8 mt-8 fade-in">
+            <h3 class="text-2xl font-bold text-[#FF69B4] mb-6 text-center">Chi tiết kết quả</h3>
+            <div id="detailed-results-list">
+                ${detailedResultsHtml}
+            </div>
+        </div>
+    `;
+    document.getElementById('restartQuizBtn').addEventListener('click', () => startQuizMode([...originalQuestions], 'normal'));
+    if (showPracticeButton) {
+        document.getElementById('practiceIncorrectBtn').addEventListener('click', startIncorrectPracticeMode);
+    }
+}
 
-        if (quizMode === 'normal' && currentIndex > 0) {
-            document.getElementById('prevBtn').addEventListener('click', showPreviousQuestion);
+function startIncorrectPracticeMode() {
+    const incorrectQuestions = originalQuestions.filter((q, index) => userAnswers[index] !== q.correctAnswerIndex);
+    if (incorrectQuestions.length > 0) {
+        startQuizMode(incorrectQuestions, 'practice');
+    } else {
+        showToast("Chúc mừng! Bạn không có câu nào sai.", 'success');
+    }
+}
+
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+    const secs = (seconds % 60).toString().padStart(2, '0');
+    return `${mins}:${secs}`;
+}
+
+// === HÀM ĐẾM GIỜ CHO QUIZ ===
+function startTimer() {
+    const timerElement = document.getElementById('timer');
+    let totalSeconds = (quizData && quizData.timeLimit) ? quizData.timeLimit * 60 : 30 * 60; // Mặc định 30 phút nếu không có timeLimit
+    let warningShown = false;
+    if (quizTimerInterval) clearInterval(quizTimerInterval);
+    quizTimerInterval = setInterval(() => {
+        if (timerElement) timerElement.textContent = formatTime(totalSeconds);
+        if (totalSeconds === 300 && !warningShown) {
+            showToast('Chỉ còn 5 phút, hãy kiểm tra lại các câu đã đánh dấu!', 'warning');
+            warningShown = true;
         }
+        if (totalSeconds <= 0) {
+            clearInterval(quizTimerInterval);
+            showToast('Hết giờ! Bài sẽ được nộp tự động.', 'info');
+            setTimeout(() => {
+                endQuiz();
+            }, 1000);
+            return;
+        }
+        totalSeconds--;
+    }, 1000);
+}
+
+// === CÁC HÀM TIỆN ÍCH ===
+
+async function saveQuizResult(finalScore, totalQuestions, percentage, timeTaken) {
+    const user = auth.currentUser;
+    if (!user) return; // Không lưu kết quả cho khách
+
+    try {
+        await addDoc(collection(db, "quiz_results"), {
+            userId: user.uid,
+            quizId: new URLSearchParams(window.location.search).get('id'),
+            quizTitle: quizData.title, // Use the stored title
+            score: finalScore,
+            totalQuestions: totalQuestions,
+            timeTaken: timeTaken,
+            percentage: percentage,
+            completedAt: new Date()
+        });
+        // Kiểm tra thành tựu
+        if (percentage === 100) await checkAndAwardAchievement(user.uid, 'GENIUS');
+        if (totalQuestions >= 30) await checkAndAwardAchievement(user.uid, 'MARATHONER');
+    } catch (error) {
+        console.error("Lỗi khi lưu kết quả:", error);
+        showToast('Không thể lưu kết quả của bạn.', 'error');
+    }
+}
+
+function updateProgressBar() {
+    const progressFill = document.getElementById('quiz-progress-fill');
+    if (progressFill) {
+        const progress = questions.length > 0 ? ((currentIndex / questions.length) * 100) : 0;
+        progressFill.style.width = `${progress}%`;
+    }
+}
+
+// === HÀM XỬ LÝ KHI CHỌN ĐÁP ÁN ===
+function handleAnswerClick(e) {
+    const selectedBtn = e.currentTarget;
+    const selectedIdx = parseInt(selectedBtn.getAttribute('data-index'));
+    if (isNaN(selectedIdx)) return;
+
+    // Nếu đã trả lời rồi thì không cho chọn lại
+    if (userAnswers[currentIndex] !== null) return;
+
+    userAnswers[currentIndex] = selectedIdx;
+    if (selectedIdx === questions[currentIndex].correctAnswerIndex) {
+        score++;
     }
 
-    function handleAnswerClick(event) {
-        const selectedButton = event.currentTarget;
-        const selectedIndex = parseInt(selectedButton.dataset.index, 10);
-        const question = questions[currentIndex];
-        const isCorrect = selectedIndex === question.correctAnswerIndex;
-
-        document.querySelectorAll('.answer-btn').forEach((button, index) => {
-            button.disabled = true;
-            button.classList.remove('hover:bg-[#FFB6C1]/50', 'hover:border-[#FF69B4]');
-            if (index === question.correctAnswerIndex) {
-                button.classList.add('bg-green-200', 'border-green-500', 'text-green-800', 'font-bold');
-                button.innerHTML += ' <i class="fas fa-check"></i>';
-            }
-        });
-
-        if (!isCorrect) {
-            selectedButton.classList.add('bg-red-200', 'border-red-500', 'text-red-800');
-            selectedButton.innerHTML += ' <i class="fas fa-times"></i>';
-        }
-
-        document.getElementById('explanation-area').classList.remove('hidden');
-
-        if (quizMode === 'practice') {
-            if (isCorrect) {
-                document.getElementById('nextBtn').classList.remove('hidden');
-                document.getElementById('nextBtn').addEventListener('click', showNextQuestion);
+    // Highlight đáp án đã chọn
+    document.querySelectorAll('.answer-btn').forEach((btn, idx) => {
+        btn.classList.remove('bg-green-200', 'bg-red-200', 'border-green-400', 'border-red-400');
+        if (idx === selectedIdx) {
+            if (selectedIdx === questions[currentIndex].correctAnswerIndex) {
+                btn.classList.add('bg-green-200', 'border-green-400');
             } else {
-                const nextButton = document.getElementById('nextBtn');
-                nextButton.textContent = 'Thử lại';
-                nextButton.classList.remove('hidden', 'bg-[#FF69B4]');
-                nextButton.classList.add('bg-yellow-500', 'hover:bg-yellow-600');
-                nextButton.onclick = () => showQuestion();
+                btn.classList.add('bg-red-200', 'border-red-400');
             }
-        } else {
-            userAnswers[currentIndex] = selectedIndex;
-            if (isCorrect) score++;
-            document.getElementById('nextBtn').classList.remove('hidden');
-            document.getElementById('nextBtn').addEventListener('click', showNextQuestion);
         }
-    }
-
-    function showNextQuestion() {
-        if (currentIndex < questions.length - 1) {
-            currentIndex++;
-            showQuestion();
-        } else {
-            endQuiz();
+        // Highlight đáp án đúng
+        if (idx === questions[currentIndex].correctAnswerIndex) {
+            btn.classList.add('bg-green-100');
         }
+        btn.disabled = true;
+    });
+
+    // Hiện giải thích
+    const explanationArea = document.getElementById('explanation-area');
+    if (explanationArea) explanationArea.classList.remove('hidden');
+
+    // Hiện nút tiếp theo
+    const nextBtn = document.getElementById('nextBtn');
+    if (nextBtn) {
+        nextBtn.classList.remove('hidden');
+        nextBtn.addEventListener('click', showNextQuestion, { once: true });
     }
+}
 
-    function showPreviousQuestion() {
-        if (currentIndex > 0) {
-            currentIndex--;
-            showQuestion();
-        }
-    }
+// Gắn trình xử lý sự kiện cho các nút
+startNowBtn.addEventListener('click', () => startQuizMode([...originalQuestions], 'normal'));
+startFlashcardBtn.addEventListener('click', startFlashcardMode);
 
-    function endQuiz() {
-        clearInterval(quizTimerInterval);
-        const totalTime = Math.floor((new Date() - quizStartTime) / 1000);
-        quizSection.innerHTML = '';
-
-        if (quizMode === 'normal') {
-            const percentage = questions.length > 0 ? Math.round((score / questions.length) * 100) : 0;
-            if (auth.currentUser) {
-                saveQuizResult(score, questions.length, percentage, totalTime);
-            }
-            showResults(totalTime);
-        } else {
-            resultsSection.classList.remove('hidden');
-            resultsSection.innerHTML = `
-                <div class="bg-white rounded-lg shadow-lg p-8 text-center fade-in">
-                    <h2 class="text-3xl font-bold text-[#FF69B4]">Tuyệt vời!</h2>
-                    <p class="text-gray-600 mt-2">Bạn đã hoàn thành luyện tập.</p>
-                    <div class="mt-8 flex justify-center">
-                        <a href="index.html" class="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition">
-                            <i class="fas fa-home mr-2"></i> Về trang chủ
-                        </a>
-                    </div>
-                </div>
-            `;
-        }
-    }
-
-    function showResults(totalTime) {
-        resultsSection.classList.remove('hidden');
-        const percentage = questions.length > 0 ? ((score / questions.length) * 100).toFixed(1) : 0;
-        const showPracticeButton = score < questions.length;
-
-        const detailedResultsHtml = questions.map((q, index) => {
-            const userAnswerIndex = userAnswers[index];
-            const isCorrect = userAnswerIndex === q.correctAnswerIndex;
-            const userAnswerText = userAnswerIndex !== null ? q.answers[userAnswerIndex] : 'Chưa trả lời';
-            const correctAnswerText = q.answers[q.correctAnswerIndex];
-
-            return `
-                <div class="mb-8 p-6 rounded-lg ${isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
-                    <div class="flex items-center mb-3">
-                        ${isCorrect ? 
-                            '<i class="fas fa-check-circle text-green-500 text-xl mr-3"></i>' : 
-                            '<i class="fas fa-times-circle text-red-500 text-xl mr-3"></i>'
-                        }
-                        <h4 class="text-lg font-semibold text-gray-800">Câu ${index + 1}: ${q.question}</h4>
-                    </div>
-                    <div class="ml-8">
-                        <p class="text-gray-700 mb-2">
-                            <span class="font-medium">Câu trả lời của bạn:</span> 
-                            <span class="${isCorrect ? 'text-green-600' : 'text-red-600'}">${userAnswerText}</span>
-                            ${!isCorrect && userAnswerIndex !== null ? `<i class="fas fa-times ml-1"></i>` : ''}
-                        </p>
-                        <p class="text-gray-700 mb-2">
-                            <span class="font-medium">Đáp án đúng:</span> 
-                            <span class="text-green-600">${correctAnswerText}</span> <i class="fas fa-check ml-1"></i>
-                        </p>
-                        <div class="mt-4 p-3 bg-gray-100 rounded-md">
-                            <h5 class="font-bold text-gray-800">Giải thích:</h5>
-                            <p class="text-gray-700">${q.explanation || 'Không có giải thích.'}</p>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-
-        resultsSection.innerHTML = `
-            <div class="bg-white rounded-lg shadow-lg p-8 text-center fade-in">
-                <h2 class="text-3xl font-bold text-[#FF69B4]">Hoàn thành!</h2>
-                <p class="text-gray-600 mt-2">Đây là kết quả của bạn:</p>
-                <div class="my-8">
-                    <p class="text-5xl font-bold text-[#FF69B4]">${percentage}%</p>
-                    <p class="text-lg text-gray-700 mt-2">Đúng ${score}/${questions.length} câu</p>
-                    <p class="text-sm text-gray-500 mt-1">Bạn đã trả lời ${questions.length - userAnswers.filter(a => a === null).length} / ${questions.length} câu</p>
-                </div>
-                <div class="text-md text-gray-500">
-                    <i class="fas fa-clock mr-2"></i> Thời gian: ${formatTime(totalTime)}
-                </div>
-                <div class="mt-8 flex justify-center flex-wrap gap-4">
-                    <button id="restartQuizBtn" class="px-6 py-3 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition">
-                        <i class="fas fa-redo mr-2"></i> Làm lại
-                    </button>
-                    ${showPracticeButton ? `
-                        <button id="practiceIncorrectBtn" class="px-6 py-3 bg-orange-400 text-white rounded-lg hover:bg-orange-500 transition">
-                            <i class="fas fa-pencil-alt mr-2"></i> Luyện tập câu sai
-                        </button>` : ''}
-                    <a href="index.html" class="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition">
-                        <i class="fas fa-home mr-2"></i> Về trang chủ
-                    </a>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-lg shadow-lg p-8 mt-8 fade-in">
-                <h3 class="text-2xl font-bold text-[#FF69B4] mb-6 text-center">Chi tiết kết quả</h3>
-                <div id="detailed-results-list">
-                    ${detailedResultsHtml}
-                </div>
-            </div>
-        `;
-
-        document.getElementById('restartQuizBtn').addEventListener('click', () => startQuizMode([...originalQuestions], 'normal'));
-        if (showPracticeButton) {
-            document.getElementById('practiceIncorrectBtn').addEventListener('click', startIncorrectPracticeMode);
-        }
-    }
-
-    function startIncorrectPracticeMode() {
-        const incorrectQuestions = originalQuestions.filter((q, index) => userAnswers[index] !== q.correctAnswerIndex);
-        if (incorrectQuestions.length > 0) {
-            startQuizMode(incorrectQuestions, 'practice');
-        } else {
-            showToast("Chúc mừng! Bạn không có câu nào sai.", 'success');
-        }
-    }
-
-    function startTimer() {
-        quizTimerInterval = setInterval(() => {
-            const elapsedTime = Math.floor((new Date() - quizStartTime) / 1000);
-            const timerInQuiz = document.getElementById('timer');
-            if (timerInQuiz) {
-                timerInQuiz.textContent = formatTime(elapsedTime);
-            }
-        }, 1000);
-    }
-
-    function formatTime(seconds) {
-        const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
-        const secs = (seconds % 60).toString().padStart(2, '0');
-        return `${mins}:${secs}`;
-    }
-
-    // === CÁC HÀM TIỆN ÍCH ===
-
-    async function saveQuizResult(finalScore, totalQuestions, percentage, timeTaken) {
-        const user = auth.currentUser;
-        if (!user) return; // Không lưu kết quả cho khách
-
-        try {
-            await addDoc(collection(db, "quiz_results"), {
-                userId: user.uid,
-                quizId: new URLSearchParams(window.location.search).get('id'),
-                quizTitle: quizData.title, // Use the stored title
-                score: finalScore,
-                totalQuestions: totalQuestions,
-                timeTaken: timeTaken,
-                percentage: percentage,
-                completedAt: new Date()
-            });
-            // Kiểm tra thành tựu
-            if (percentage === 100) await checkAndAwardAchievement(user.uid, 'GENIUS');
-            if (totalQuestions >= 30) await checkAndAwardAchievement(user.uid, 'MARATHONER');
-        } catch (error) {
-            console.error("Lỗi khi lưu kết quả:", error);
-            showToast('Không thể lưu kết quả của bạn.', 'error');
-        }
-    }
-
-    function updateProgressBar() {
-        const progressFill = document.getElementById('quiz-progress-fill');
-        if (progressFill) {
-            const progress = questions.length > 0 ? ((currentIndex / questions.length) * 100) : 0;
-            progressFill.style.width = `${progress}%`;
-        }
-    }
-
-    // Gắn trình xử lý sự kiện cho các nút
-    startNowBtn.addEventListener('click', () => startQuizMode([...originalQuestions], 'normal'));
-    startFlashcardBtn.addEventListener('click', startFlashcardMode);
-
-    // Tải dữ liệu bộ đề ngay khi trang được tải
-    loadQuizData();
+// Tải dữ liệu bộ đề ngay khi trang được tải
+loadQuizData();
 });

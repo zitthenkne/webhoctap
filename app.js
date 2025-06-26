@@ -589,7 +589,23 @@ function setupEventListeners() {
     document.body.addEventListener('click', (event) => {
         // Button to create a new study room from the "My Rooms" panel
         if (event.target.id === 'create-new-study-room-btn') {
-            window.location.href = 'study-room.html'; // Redirect to create a new room
+            // Tạo phòng mới trên Firestore, rồi chuyển hướng sang study-room.html?id=...
+            (async () => {
+                const user = auth.currentUser;
+                if (!user) {
+                    showToast('Vui lòng đăng nhập để tạo phòng!', 'warning');
+                    toggleAuthModal();
+                    return;
+                }
+                const { serverTimestamp } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
+                const roomRef = await addDoc(collection(db, 'study_rooms'), {
+                    owner: user.uid,
+                    createdAt: serverTimestamp(),
+                    background: null
+                });
+                window.location.href = `study-room.html?id=${roomRef.id}`;
+            })();
+            return;
         }
 
         // Delete button for a specific study room

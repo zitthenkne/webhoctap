@@ -35,10 +35,15 @@
         <div class="absolute top-4 left-4 bg-white/80 backdrop-blur-md rounded-lg shadow-lg p-2 flex flex-col gap-2 z-10">
             <button data-tool="select" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition active"><i class="fas fa-mouse-pointer"></i></button>
             <button data-tool="pen" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition"><i class="fas fa-pen"></i></button>
+            <button data-tool="highlight" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-yellow-100 transition" title="Highlight"><i class="fas fa-highlighter"></i></button>
             <button data-tool="line" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition"><i class="fas fa-minus"></i></button>
+            <button data-tool="rectangle" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Rectangle"><i class="far fa-square"></i></button>
+            <button data-tool="circle" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Circle"><i class="far fa-circle"></i></button>
             <button data-tool="eraser" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition"><i class="fas fa-eraser"></i></button>
             <input type="color" id="color-picker" value="#FF69B4" class="w-10 h-10 p-1 border-none rounded cursor-pointer bg-white">
             <input type="range" id="line-width" min="1" max="50" value="5" class="w-20 mx-auto my-2">
+            <label class="flex items-center gap-2 px-2 cursor-pointer select-none text-xs"><input type="checkbox" id="dashed-checkbox" class="accent-pink-400"> Nét đứt</label>
+            <label class="flex items-center gap-2 px-2 cursor-pointer select-none text-xs"><input type="checkbox" id="fill-checkbox" class="accent-pink-400"> Tô màu</label>
             <button id="upload-image-object-btn" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Tải ảnh lên bảng"><i class="fas fa-image"></i></button>
             <input type="file" id="image-object-file-input" class="hidden" accept="image/*">
             <button id="undo-btn" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition opacity-50" disabled><i class="fas fa-undo"></i></button>
@@ -51,6 +56,27 @@
             <canvas id="whiteboard" class="absolute top-0 left-0"></canvas>
         </div>
 
+        <!-- --- PHÒNG HỌC: KHU VỰC CHAT & THÀNH VIÊN --- -->
+        <aside class="absolute top-4 right-4 w-80 max-w-full bg-white/90 rounded-lg shadow-lg flex flex-col z-20 h-[90%]">
+            <!-- Danh sách thành viên online -->
+            <div class="p-4 border-b border-pink-100 flex items-center justify-between">
+                <div class="font-bold text-[#FF69B4] flex items-center gap-2"><i class="fas fa-users"></i> Thành viên</div>
+                <button id="invite-member-btn" class="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition flex items-center gap-1"><i class="fas fa-user-plus"></i> Mời</button>
+            </div>
+            <ul id="member-list" class="flex-1 overflow-y-auto p-2 space-y-2 text-sm"></ul>
+            <!-- Thông báo vào/ra phòng -->
+            <div id="room-notice-area" class="px-4 py-2 text-xs text-gray-500"></div>
+            <!-- Chat realtime -->
+            <div class="flex-1 flex flex-col border-t border-pink-100">
+                <div id="chat-messages" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
+                <form id="chat-form" class="flex items-center gap-2 p-2 border-t border-pink-100">
+                    <input id="chat-input" type="text" placeholder="Nhập tin nhắn..." class="flex-1 px-3 py-2 rounded border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#FF69B4]" autocomplete="off">
+                    <button type="submit" class="px-3 py-2 bg-[#FF69B4] text-white rounded hover:bg-opacity-80 transition"><i class="fas fa-paper-plane"></i></button>
+                </form>
+            </div>
+            <!-- Chia sẻ tiến độ/kết quả quiz -->
+            <div id="quiz-progress-share-area" class="p-2 border-t border-pink-100 text-xs text-gray-600"></div>
+        </aside>
         <!-- Loading Overlay -->
         <div id="loading-overlay" class="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
             <div class="text-center">

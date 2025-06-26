@@ -1,3 +1,5 @@
+// --- Imports ---
+// Kết hợp các import từ cả hai file và loại bỏ trùng lặp
 import { db, auth, storage } from './firebase-init.js';
 import { doc, getDoc, setDoc, onSnapshot, collection, addDoc, query, orderBy, serverTimestamp, deleteDoc, getDocs, updateDoc, writeBatch } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js";
 import { onAuthStateChanged, signInAnonymously } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js";
@@ -5,11 +7,20 @@ import { ref, uploadBytes, getDownloadURL, deleteObject } from "https://www.gsta
 import { showToast } from './utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // --- DOM Elements ---
+    // --- DOM Elements (Hợp nhất từ cả hai file) ---
+    // Chat & Members
+    const memberList = document.getElementById('member-list');
+    const chatMessages = document.getElementById('chat-messages');
+    const chatForm = document.getElementById('chat-form');
+    const chatInput = document.getElementById('chat-input');
+    const roomNoticeArea = document.getElementById('room-notice-area');
+    const inviteMemberBtn = document.getElementById('invite-member-btn'); // Nút mời trong khu vực chat
+
+    // Whiteboard
     const canvas = document.getElementById('whiteboard');
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas ? canvas.getContext('2d') : null;
     const roomIdDisplay = document.getElementById('room-id-display');
-    const shareBtn = document.getElementById('share-room-btn');
+    const shareBtn = document.getElementById('share-room-btn'); // Nút chia sẻ ở thanh công cụ whiteboard
     const colorPicker = document.getElementById('color-picker');
     const lineWidth = document.getElementById('line-width');
     const clearCanvasBtn = document.getElementById('clear-canvas-btn');
@@ -17,11 +28,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const undoBtn = document.getElementById('undo-btn');
     const redoBtn = document.getElementById('redo-btn');
     const loadingOverlay = document.getElementById('loading-overlay');
-    // New DOM elements for image object upload
     const uploadImageObjectBtn = document.getElementById('upload-image-object-btn');
     const imageObjectFileInput = document.getElementById('image-object-file-input');
 
-    // --- Quiz Collaboration DOM Elements ---
+    // Collaborative Quiz
     const startCollaborativeQuizBtn = document.getElementById('start-collaborative-quiz-btn');
     const collaborativeQuizModal = document.getElementById('collaborative-quiz-modal');
     const closeCollaborativeQuizModalBtn = document.getElementById('close-collaborative-quiz-modal-btn');
@@ -41,54 +51,137 @@ document.addEventListener('DOMContentLoaded', () => {
     const questionCounter = document.getElementById('question-counter');
     const finishQuizCollaborationBtn = document.getElementById('finish-quiz-collaboration-btn');
 
-    // --- State Management ---
+    // --- State Management (Hợp nhất từ cả hai file) ---
     let roomId = null;
+    let user = null; // Biến user toàn cục để dễ truy cập
     let roomUnsubscribe = null;
-    let isDrawing = false; // For pen, line, eraser
-    let isDragging = false; // For select tool
-    let currentTool = 'pen';
+    let memberUnsubscribe = null; // Listener cho member
+    let chatUnsubscribe = null; // Listener cho chat
 
-    // Object-based drawing state
+    // Whiteboard state
+    let isDrawing = false;
+    let isDragging = false;
+    let currentTool = 'pen';
     let canvasObjects = [];
-    let currentPath = []; // For building a 'pen' stroke
+    let currentPath = [];
     let selectedObject = null;
     let dragOffsetX, dragOffsetY;
-
-    // Tool-specific state
     let startX, startY;
-
-    // Undo/Redo state (local only)
     let history = [];
     let historyIndex = -1;
-
-    // Background state
     let currentBackgroundUrl = null;
-    let currentBackgroundType = null;
     const backgroundImage = new Image();
-    // Important for loading images from Firebase Storage
     backgroundImage.crossOrigin = "anonymous";
+    // NEW: tool options
+    let toolOptions = {
+        pen: { color: '#000000', width: 2, dashed: false },
+        highlight: { color: '#ffff0066', width: 12, dashed: false },
+        line: { color: '#000000', width: 2, dashed: false },
+        rectangle: { color: '#000000', width: 2, dashed: false, fill: false },
+        circle: { color: '#000000', width: 2, dashed: false, fill: false },
+        eraser: { width: 16 }
+    };
+    let currentDashed = false;
+    let currentFill = false;
 
-    // --- Quiz Collaboration State ---
-    let currentQuizData = null; // Stores questions, hostId, currentQuestionIndex, etc.
+    // Quiz Collaboration State
+    let currentQuizData = null;
     let currentQuestionIndex = 0;
-    let isHost = false; // True if current user is the host of the collaborative quiz session
-    let quizSessionUnsubscribe = null; // Listener for quiz session changes
+    let isHost = false;
+    let quizSessionUnsubscribe = null;
 
+    // --- NEW: Member & Chat Management (Từ file thứ hai) ---
+
+    function listenToMembers() {
+        if (memberUnsubscribe) memberUnsubscribe();
+        const membersRef = collection(db, 'study_rooms', roomId, 'members');
+        memberUnsubscribe = onSnapshot(membersRef, (snapshot) => {
+            if (!memberList) return;
+            memberList.innerHTML = '';
+            let memberCount = 0;
+            snapshot.forEach(doc => {
+                memberCount++;
+                const data = doc.data();
+                const li = document.createElement('li');
+                li.className = 'flex items-center gap-2 p-2 rounded bg-pink-50 text-sm';
+                li.innerHTML = `<i class="fas fa-user-circle text-[#FF69B4]"></i> <span>${data.displayName || 'Khách'}</span>`;
+                memberList.appendChild(li);
+            });
+            if (roomNoticeArea) {
+                roomNoticeArea.textContent = `Đang online: ${memberCount} thành viên.`;
+            }
+        });
+    }
+
+    async function joinRoomAsMember() {
+        if (!user || !roomId) return;
+        const memberRef = doc(db, 'study_rooms', roomId, 'members', user.uid);
+        await setDoc(memberRef, {
+            uid: user.uid,
+            displayName: user.displayName || user.email || `Khách_${user.uid.substring(0, 5)}`,
+            joinedAt: serverTimestamp()
+        });
+        // Thông báo vào phòng
+        await addDoc(collection(db, 'study_rooms', roomId, 'messages'), {
+            type: 'notice',
+            text: `${user.displayName || user.email || 'Khách'} đã vào phòng.`,
+            createdAt: serverTimestamp()
+        });
+    }
+
+    async function leaveRoomAsMember() {
+        if (!user || !roomId) return;
+        const memberRef = doc(db, 'study_rooms', roomId, 'members', user.uid);
+        // Thông báo rời phòng TRƯỚC khi xóa để đảm bảo tin nhắn được gửi
+        await addDoc(collection(db, 'study_rooms', roomId, 'messages'), {
+            type: 'notice',
+            text: `${user.displayName || user.email || 'Khách'} đã rời phòng.`,
+            createdAt: serverTimestamp()
+        });
+        await deleteDoc(memberRef);
+    }
+
+    function listenToChat() {
+        if (chatUnsubscribe) chatUnsubscribe();
+        const chatRef = collection(db, 'study_rooms', roomId, 'messages');
+        const q = query(chatRef, orderBy('createdAt'));
+        chatUnsubscribe = onSnapshot(q, (snapshot) => {
+            if (!chatMessages) return;
+            chatMessages.innerHTML = '';
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                const div = document.createElement('div');
+                if (data.type === 'notice') {
+                    div.className = 'text-center text-xs text-gray-400 my-2 italic';
+                    div.textContent = data.text;
+                } else {
+                    const isMe = data.uid === user?.uid;
+                    div.className = `flex flex-col mb-2 ${isMe ? 'items-end' : 'items-start'}`;
+                    div.innerHTML = `
+                        <div class="text-xs text-gray-500 ${isMe ? 'mr-2' : 'ml-2'}">${data.displayName || 'Khách'}</div>
+                        <div class="max-w-xs p-2 rounded-lg ${isMe ? 'bg-[#FFB6C1] text-black' : 'bg-gray-200'}">
+                           ${data.text}
+                        </div>`;
+                }
+                chatMessages.appendChild(div);
+            });
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        });
+    }
+    
+    // --- Whiteboard & Quiz Logic (Từ file đầu tiên - cao cấp hơn) ---
+    // (Toàn bộ các hàm từ `getEventCoords` đến `finishQuizCollaborationBtn` event listener được giữ lại y nguyên từ file đầu tiên của bạn)
     // --- Helper to get coordinates for mouse and touch events ---
     function getEventCoords(e) {
         let x, y;
         const rect = canvas.getBoundingClientRect();
-
         if (e.touches && e.touches.length > 0) {
-            // For touchstart and touchmove
             x = e.touches[0].clientX - rect.left;
             y = e.touches[0].clientY - rect.top;
         } else if (e.changedTouches && e.changedTouches.length > 0) {
-            // For touchend
             x = e.changedTouches[0].clientX - rect.left;
             y = e.changedTouches[0].clientY - rect.top;
         } else {
-            // For mouse events
             x = e.offsetX;
             y = e.offsetY;
         }
@@ -96,51 +189,47 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     // --- Canvas Setup ---
     function resizeCanvas() {
+        if (!canvas) return;
         const container = document.getElementById('canvas-container');
         const dpr = window.devicePixelRatio || 1;
         const rect = container.getBoundingClientRect();
-
         canvas.width = rect.width * dpr;
         canvas.height = rect.height * dpr;
         ctx.scale(dpr, dpr);
-
         canvas.style.width = `${rect.width}px`;
         canvas.style.height = `${rect.height}px`;
-
         redrawCanvas();
     }
 
     // --- Drawing & Redrawing ---
     function redrawCanvas() {
+        if (!ctx) return;
         const logicalWidth = canvas.width / (window.devicePixelRatio || 1);
         const logicalHeight = canvas.height / (window.devicePixelRatio || 1);
         ctx.clearRect(0, 0, logicalWidth, logicalHeight);
-
-        // Draw background image if it's loaded
-        if (currentBackgroundUrl && backgroundImage.src === currentBackgroundUrl && backgroundImage.complete) {
+        if (backgroundImage.src && backgroundImage.complete) {
             ctx.drawImage(backgroundImage, 0, 0, logicalWidth, logicalHeight);
         }
-
-        // Draw all objects
         canvasObjects.forEach(obj => drawObject(obj));
-
-        // Draw selection box if an object is selected
         if (selectedObject) {
             drawSelectionBox(selectedObject);
         }
     }
 
     function drawObject(obj) {
+        if (!ctx) return;
+        ctx.save();
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
+        ctx.globalAlpha = obj.tool === 'highlight' ? 0.4 : 1;
         ctx.globalCompositeOperation = (obj.tool === 'eraser') ? 'destination-out' : 'source-over';
         ctx.strokeStyle = obj.color;
         ctx.lineWidth = obj.width;
-
+        ctx.setLineDash(obj.dashed ? [8, 8] : []);
         ctx.beginPath();
         switch (obj.type) {
             case 'stroke':
-                if (obj.path.length === 0) return;
+                if (obj.path.length === 0) break;
                 ctx.moveTo(obj.path[0].x, obj.path[0].y);
                 for (let i = 1; i < obj.path.length; i++) {
                     ctx.lineTo(obj.path[i].x, obj.path[i].y);
@@ -155,13 +244,33 @@ document.addEventListener('DOMContentLoaded', () => {
                 ctx.moveTo(obj.startX, obj.startY);
                 ctx.lineTo(obj.endX, obj.endY);
                 break;
+            case 'rectangle':
+                if (obj.fill) {
+                    ctx.fillStyle = obj.color;
+                    ctx.globalAlpha = obj.tool === 'highlight' ? 0.3 : 1;
+                    ctx.fillRect(obj.x, obj.y, obj.width, obj.height);
+                }
+                ctx.rect(obj.x, obj.y, obj.width, obj.height);
+                break;
+            case 'circle':
+                ctx.arc(obj.x + obj.radius, obj.y + obj.radius, obj.radius, 0, 2 * Math.PI);
+                if (obj.fill) {
+                    ctx.fillStyle = obj.color;
+                    ctx.globalAlpha = obj.tool === 'highlight' ? 0.3 : 1;
+                    ctx.fill();
+                }
+                break;
         }
-        ctx.stroke();
-        ctx.globalCompositeOperation = 'source-over'; // Reset composite operation
+        if (obj.type !== 'image' && obj.type !== 'circle') ctx.stroke();
+        if (obj.type === 'circle') ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.globalAlpha = 1;
+        ctx.restore();
+        ctx.globalCompositeOperation = 'source-over';
     }
 
     function drawSelectionBox(obj) {
-        if (!obj.bounds) return;
+        if (!obj.bounds || !ctx) return;
         ctx.strokeStyle = '#FF69B4';
         ctx.lineWidth = 1;
         ctx.setLineDash([4, 4]);
@@ -175,7 +284,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const { x, y } = getEventCoords(e);
         startX = x;
         startY = y;
-
         if (currentTool === 'select') {
             selectedObject = getObjectAtPoint(x, y);
             if (selectedObject) {
@@ -187,9 +295,8 @@ document.addEventListener('DOMContentLoaded', () => {
             redrawCanvas();
             return;
         }
-
         isDrawing = true;
-        if (currentTool === 'pen' || currentTool === 'eraser') {
+        if (currentTool === 'pen' || currentTool === 'eraser' || currentTool === 'highlight') {
             currentPath = [{ x, y }];
         }
     }
@@ -198,7 +305,6 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         if (!isDrawing && !isDragging) return;
         const { x, y } = getEventCoords(e);
-
         if (isDragging && selectedObject) {
             const deltaX = (x - dragOffsetX) - selectedObject.bounds.minX;
             const deltaY = (y - dragOffsetY) - selectedObject.bounds.minY;
@@ -206,62 +312,74 @@ document.addEventListener('DOMContentLoaded', () => {
             redrawCanvas();
             return;
         }
-
         if (isDrawing) {
-            if (currentTool === 'pen' || currentTool === 'eraser') {
-                // Draw the latest segment for immediate feedback
+            if (currentTool === 'pen' || currentTool === 'eraser' || currentTool === 'highlight') {
                 const lastPoint = currentPath[currentPath.length - 1];
                 const tempObj = {
                     type: 'stroke', tool: currentTool, path: [{x: lastPoint.x, y: lastPoint.y}, {x, y}],
-                    color: colorPicker.value, width: lineWidth.value
+                    color: toolOptions[currentTool].color, width: toolOptions[currentTool].width, dashed: toolOptions[currentTool].dashed
                 };
                 drawObject(tempObj);
                 currentPath.push({ x, y });
             } else if (currentTool === 'line') {
-                redrawCanvas(); // Redraw to clear previous temp line
-                const tempLine = { type: 'line', startX, startY, endX: x, endY: y, color: colorPicker.value, width: lineWidth.value };
+                redrawCanvas();
+                const tempLine = { type: 'line', startX, startY, endX: x, endY: y, color: toolOptions.line.color, width: toolOptions.line.width, dashed: toolOptions.line.dashed };
                 drawObject(tempLine);
+            } else if (currentTool === 'rectangle') {
+                redrawCanvas();
+                const rect = { type: 'rectangle', x: Math.min(startX, x), y: Math.min(startY, y), width: Math.abs(x - startX), height: Math.abs(y - startY), color: toolOptions.rectangle.color, width: toolOptions.rectangle.width, dashed: toolOptions.rectangle.dashed, fill: toolOptions.rectangle.fill, tool: 'rectangle' };
+                drawObject(rect);
+            } else if (currentTool === 'circle') {
+                redrawCanvas();
+                const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) / 2;
+                const cx = (startX + x) / 2;
+                const cy = (startY + y) / 2;
+                const circ = { type: 'circle', x: cx - radius, y: cy - radius, radius, color: toolOptions.circle.color, width: toolOptions.circle.width, dashed: toolOptions.circle.dashed, fill: toolOptions.circle.fill, tool: 'circle' };
+                drawObject(circ);
             }
         }
     }
 
     async function endAction(e) {
         e.preventDefault();
-
-        // Handle the end of a drag-and-drop action for the 'select' tool
         if (isDragging && selectedObject) {
             isDragging = false;
             canvas.style.cursor = 'grab';
             await updateObjectInFirestore(selectedObject);
             saveHistory();
-            return; // Action is complete, no need to process other tools
+            return;
         }
-
-        // If not dragging and not drawing, do nothing
         if (!isDrawing) return;
         isDrawing = false;
-
         let newObjectData = null;
-        if (currentTool === 'pen' || currentTool === 'eraser') {
+        if (currentTool === 'pen' || currentTool === 'eraser' || currentTool === 'highlight') {
             if (currentPath.length < 2) {
-                currentPath = [];
-                return;
+                currentPath = []; return;
             }
-            newObjectData = { type: 'stroke', tool: currentTool, path: currentPath, color: colorPicker.value, width: parseInt(lineWidth.value, 10) };
+            newObjectData = { type: 'stroke', tool: currentTool, path: currentPath, color: toolOptions[currentTool].color, width: toolOptions[currentTool].width, dashed: toolOptions[currentTool].dashed };
         } else if (currentTool === 'line') {
             const { x, y } = getEventCoords(e);
-            if (x === startX && y === startY) { // Prevent zero-length lines on a simple click
-                currentPath = [];
-                return;
+            if (x === startX && y === startY) {
+                 currentPath = []; return;
             }
-            newObjectData = { type: 'line', startX, startY, endX: x, endY: y, color: colorPicker.value, width: parseInt(lineWidth.value, 10) };
+            newObjectData = { type: 'line', startX, startY, endX: x, endY: y, color: toolOptions.line.color, width: toolOptions.line.width, dashed: toolOptions.line.dashed };
+        } else if (currentTool === 'rectangle') {
+            const { x, y } = getEventCoords(e);
+            if (x === startX && y === startY) return;
+            newObjectData = { type: 'rectangle', x: Math.min(startX, x), y: Math.min(startY, y), width: Math.abs(x - startX), height: Math.abs(y - startY), color: toolOptions.rectangle.color, width: toolOptions.rectangle.width, dashed: toolOptions.rectangle.dashed, fill: toolOptions.rectangle.fill, tool: 'rectangle' };
+        } else if (currentTool === 'circle') {
+            const { x, y } = getEventCoords(e);
+            if (x === startX && y === startY) return;
+            const radius = Math.sqrt(Math.pow(x - startX, 2) + Math.pow(y - startY, 2)) / 2;
+            const cx = (startX + x) / 2;
+            const cy = (startY + y) / 2;
+            newObjectData = { type: 'circle', x: cx - radius, y: cy - radius, radius, color: toolOptions.circle.color, width: toolOptions.circle.width, dashed: toolOptions.circle.dashed, fill: toolOptions.circle.fill, tool: 'circle' };
         }
-
         if (newObjectData) {
-            newObjectData.author = auth.currentUser ? auth.currentUser.uid : 'anonymous';
+            newObjectData.author = user ? user.uid : 'anonymous';
             newObjectData.bounds = calculateBounds(newObjectData);
             const docRef = await sendObjectToFirestore(newObjectData);
-            if (docRef) { // Check if send was successful
+            if (docRef) {
                 canvasObjects.push({ ...newObjectData, id: docRef.id });
                 redrawCanvas();
                 saveHistory();
@@ -275,35 +393,30 @@ document.addEventListener('DOMContentLoaded', () => {
         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
         if (obj.type === 'stroke') {
             obj.path.forEach(p => {
-                minX = Math.min(minX, p.x);
-                minY = Math.min(minY, p.y);
-                maxX = Math.max(maxX, p.x);
-                maxY = Math.max(maxY, p.y);
+                minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+                maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
             });
         } else if (obj.type === 'line') {
-            minX = Math.min(obj.startX, obj.endX);
-            minY = Math.min(obj.startY, obj.endY);
-            maxX = Math.max(obj.startX, obj.endX);
-            maxY = Math.max(obj.startY, obj.endY);
+            minX = Math.min(obj.startX, obj.endX); minY = Math.min(obj.startY, obj.endY);
+            maxX = Math.max(obj.startX, obj.endX); maxY = Math.max(obj.startY, obj.endY);
         } else if (obj.type === 'image') {
-            minX = obj.x;
-            minY = obj.y;
-            maxX = obj.x + obj.width;
-            maxY = obj.y + obj.height;
+            minX = obj.x; minY = obj.y;
+            maxX = obj.x + obj.width; maxY = obj.y + obj.height;
+        } else if (obj.type === 'rectangle') {
+            minX = obj.x; minY = obj.y;
+            maxX = obj.x + obj.width; maxY = obj.y + obj.height;
+        } else if (obj.type === 'circle') {
+            minX = obj.x; minY = obj.y;
+            maxX = obj.x + obj.radius * 2; maxY = obj.y + obj.radius * 2;
         }
         return { minX, minY, maxX, maxY };
     }
 
     function getObjectAtPoint(x, y) {
-        // Iterate backwards to select the top-most object
         for (let i = canvasObjects.length - 1; i >= 0; i--) {
             const obj = canvasObjects[i];
-            // Ensure bounds exist, if not, calculate them (for backward compatibility or corrupted data)
-            if (!obj.bounds) {
-                obj.bounds = calculateBounds(obj);
-            }
+            if (!obj.bounds) { obj.bounds = calculateBounds(obj); }
             if (obj.bounds && x >= obj.bounds.minX && x <= obj.bounds.maxX && y >= obj.bounds.minY && y <= obj.bounds.maxY) {
-                // More precise hit-testing could be added here
                 return obj;
             }
         }
@@ -312,24 +425,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function moveObject(obj, deltaX, deltaY) {
         if (obj.type === 'stroke') {
-            obj.path.forEach(p => {
-                p.x += deltaX;
-                p.y += deltaY;
-            });
+            obj.path.forEach(p => { p.x += deltaX; p.y += deltaY; });
         } else if (obj.type === 'line') {
-            obj.startX += deltaX;
-            obj.startY += deltaY;
-            obj.endX += deltaX;
-            obj.endY += deltaY;
+            obj.startX += deltaX; obj.startY += deltaY;
+            obj.endX += deltaX; obj.endY += deltaY;
+        } else if (obj.type === 'image') {
+            obj.x += deltaX; obj.y += deltaY;
+        } else if (obj.type === 'rectangle') {
+            obj.x += deltaX; obj.y += deltaY;
+        } else if (obj.type === 'circle') {
+            obj.x += deltaX; obj.y += deltaY;
         }
-        else if (obj.type === 'image') {
-            obj.x += deltaX;
-            obj.y += deltaY;
-        }
-        obj.bounds.minX += deltaX;
-        obj.bounds.minY += deltaY;
-        obj.bounds.maxX += deltaX;
-        obj.bounds.maxY += deltaY;
+        obj.bounds.minX += deltaX; obj.bounds.minY += deltaY;
+        obj.bounds.maxX += deltaX; obj.bounds.maxY += deltaY;
     }
 
     // --- History (Undo/Redo) ---
@@ -346,6 +454,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (historyIndex > 0) {
             historyIndex--;
             canvasObjects = JSON.parse(JSON.stringify(history[historyIndex]));
+            // Phải tải lại các đối tượng ảnh sau khi undo
+            canvasObjects.forEach(obj => {
+                if (obj.type === 'image' && !obj.imgElement) {
+                     const img = new Image();
+                     img.crossOrigin = "anonymous";
+                     img.src = obj.url;
+                     obj.imgElement = img;
+                     img.onload = () => redrawCanvas();
+                }
+            });
             redrawCanvas();
             updateUndoRedoButtons();
         }
@@ -355,12 +473,23 @@ document.addEventListener('DOMContentLoaded', () => {
         if (historyIndex < history.length - 1) {
             historyIndex++;
             canvasObjects = JSON.parse(JSON.stringify(history[historyIndex]));
+            // Tương tự, tải lại ảnh khi redo
+             canvasObjects.forEach(obj => {
+                if (obj.type === 'image' && !obj.imgElement) {
+                     const img = new Image();
+                     img.crossOrigin = "anonymous";
+                     img.src = obj.url;
+                     obj.imgElement = img;
+                     img.onload = () => redrawCanvas();
+                }
+            });
             redrawCanvas();
             updateUndoRedoButtons();
         }
     }
 
     function updateUndoRedoButtons() {
+        if (!undoBtn || !redoBtn) return;
         undoBtn.disabled = historyIndex <= 0;
         redoBtn.disabled = historyIndex >= history.length - 1;
         undoBtn.classList.toggle('opacity-50', undoBtn.disabled);
@@ -382,27 +511,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!roomId || !obj.id) return;
         try {
             const objRef = doc(db, 'study_rooms', roomId, 'drawings', obj.id);
-
-            // Create a plain object with only the fields that can be moved/changed.
-            // This prevents sending the entire object, which might contain local-only state
-            // or complex references in the future, and is more efficient and robust.
-            const dataToUpdate = {
-                bounds: obj.bounds,
-            };
-
-            if (obj.type === 'stroke') {
-                dataToUpdate.path = obj.path;
-            } else if (obj.type === 'line') {
-                dataToUpdate.startX = obj.startX;
-                dataToUpdate.startY = obj.startY;
-                dataToUpdate.endX = obj.endX;
-                dataToUpdate.endY = obj.endY;
+            const dataToUpdate = { bounds: obj.bounds };
+            if (obj.type === 'stroke') { dataToUpdate.path = obj.path; }
+            else if (obj.type === 'line') {
+                dataToUpdate.startX = obj.startX; dataToUpdate.startY = obj.startY;
+                dataToUpdate.endX = obj.endX; dataToUpdate.endY = obj.endY;
+            } else if (obj.type === 'image') {
+                dataToUpdate.x = obj.x; dataToUpdate.y = obj.y;
             }
-            else if (obj.type === 'image') {
-                dataToUpdate.x = obj.x;
-                dataToUpdate.y = obj.y;
-            }
-
             await updateDoc(objRef, dataToUpdate);
         } catch (error) {
             console.error("Error updating object in Firestore:", error);
@@ -412,33 +528,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function listenToRoomChanges() {
         if (roomUnsubscribe) roomUnsubscribe();
-
         const roomDrawingsRef = collection(db, 'study_rooms', roomId, 'drawings');
         const q = query(roomDrawingsRef, orderBy("timestamp"));
-
         roomUnsubscribe = onSnapshot(q, (snapshot) => {
             snapshot.docChanges().forEach((change) => {
-                // Ignore local changes that have not yet been written to the server.
-                // The UI is already updated optimistically. This prevents the object
-                // from "snapping back" to its old position due to the listener echo.
-                if (change.doc.metadata.hasPendingWrites) {
-                    return;
-                }
+                if (change.doc.metadata.hasPendingWrites) { return; }
                 const data = change.doc.data();
                 const id = change.doc.id;
-
                 if (change.type === "added") {
-                    // Prevent echo by checking if we already have this object
                     if (!canvasObjects.some(obj => obj.id === id)) {
                         canvasObjects.push({ ...data, id });
-                        // If it's an image, load it
                         if (data.type === 'image') {
                             const img = new Image();
-                            img.crossOrigin = "anonymous"; // Important for CORS if image is from different origin
+                            img.crossOrigin = "anonymous";
                             img.src = data.url;
                             img.onload = () => {
                                 const loadedObj = canvasObjects.find(o => o.id === id);
-                                if (loadedObj) loadedObj.imgElement = img; // Store the loaded image element
+                                if (loadedObj) loadedObj.imgElement = img;
                                 redrawCanvas();
                             };
                         }
@@ -447,10 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else if (change.type === "modified") {
                     const index = canvasObjects.findIndex(obj => obj.id === id);
                     if (index !== -1) {
-                        // Update properties of the existing object in place
-                        // This helps preserve the object reference if other parts of the code hold it
                         Object.assign(canvasObjects[index], data);
-                        // If it's an image and URL changed or imgElement not present, reload
                         if (data.type === 'image' && (!canvasObjects[index].imgElement || canvasObjects[index].imgElement.src !== data.url)) {
                             const img = new Image();
                             img.crossOrigin = "anonymous";
@@ -460,7 +563,7 @@ document.addEventListener('DOMContentLoaded', () => {
                                 redrawCanvas();
                             };
                         }
-                        canvasObjects[index].id = id; // Ensure ID is preserved
+                        canvasObjects[index].id = id;
                         redrawCanvas();
                     }
                 } else if (change.type === "removed") {
@@ -468,33 +571,30 @@ document.addEventListener('DOMContentLoaded', () => {
                     redrawCanvas();
                 }
             });
+            // Sau khi nhận thay đổi, lưu lại lịch sử
+            // Điều này làm cho undo/redo đồng bộ hơn giữa các client
+            saveHistory();
         });
     }
 
     async function clearAllDrawings() {
         if (!roomId) return;
         if (!confirm('Bạn có chắc muốn xóa toàn bộ bảng? Hành động này sẽ xóa cho tất cả mọi người.')) return;
-
-        // Clear locally for instant feedback
         canvasObjects = [];
-        saveHistory();
-        redrawCanvas();
-
-        // Delete all documents in the 'drawings' subcollection in a batch
+        redrawCanvas(); // Cập nhật ngay lập tức
         const drawingsRef = collection(db, 'study_rooms', roomId, 'drawings');
         const querySnapshot = await getDocs(drawingsRef);
         const batch = writeBatch(db);
-        querySnapshot.forEach((doc) => {
-            batch.delete(doc.ref);
-        });
+        querySnapshot.forEach((doc) => { batch.delete(doc.ref); });
         await batch.commit();
+        saveHistory();
     }
-
+    
     // --- Image Object Management ---
+    // Giữ nguyên các hàm handleImageObjectUpload, parseQuizFile, renderQuizQuestion, listenToQuizSessionChanges
     async function handleImageObjectUpload(e) {
         const file = e.target.files[0];
         if (!file || !roomId) return;
-
         if (!file.type.startsWith('image/')) {
             showToast('Vui lòng chọn một file ảnh (PNG, JPG...).', 'warning');
             return;
@@ -503,30 +603,22 @@ document.addEventListener('DOMContentLoaded', () => {
             showToast('Kích thước file quá lớn (tối đa 5MB).', 'warning');
             return;
         }
-
         loadingOverlay.classList.remove('hidden');
         showToast('Đang tải ảnh lên bảng...', 'info');
-
         try {
             const storagePath = `drawing_images/${roomId}/${Date.now()}-${file.name}`;
             const storageRef = ref(storage, storagePath);
             const uploadResult = await uploadBytes(storageRef, file);
             const downloadURL = await getDownloadURL(uploadResult.ref);
-
-            // Get image dimensions to set initial size on canvas
             const img = new Image();
             img.src = downloadURL;
-            await new Promise(resolve => img.onload = resolve); // Wait for image to load to get dimensions
-
+            await new Promise(resolve => img.onload = resolve);
             const canvasLogicalWidth = canvas.width / (window.devicePixelRatio || 1);
             const canvasLogicalHeight = canvas.height / (window.devicePixelRatio || 1);
-
-            // Calculate initial size and position, scale down if too large
             let displayWidth = img.width;
             let displayHeight = img.height;
-            const maxWidth = canvasLogicalWidth * 0.8; // Max 80% of canvas width
-            const maxHeight = canvasLogicalHeight * 0.8; // Max 80% of canvas height
-
+            const maxWidth = canvasLogicalWidth * 0.8;
+            const maxHeight = canvasLogicalHeight * 0.8;
             if (displayWidth > maxWidth) {
                 displayHeight = (displayHeight / displayWidth) * maxWidth;
                 displayWidth = maxWidth;
@@ -535,42 +627,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 displayWidth = (displayWidth / displayHeight) * maxHeight;
                 displayHeight = maxHeight;
             }
-
             const initialX = (canvasLogicalWidth - displayWidth) / 2;
             const initialY = (canvasLogicalHeight - displayHeight) / 2;
-
             const newImageObject = {
-                type: 'image',
-                url: downloadURL,
-                storagePath: storagePath, // Store path for deletion from storage if needed later
-                x: initialX,
-                y: initialY,
-                width: displayWidth,
-                height: displayHeight,
-                author: auth.currentUser ? auth.currentUser.uid : 'anonymous',
-                timestamp: serverTimestamp() // Add timestamp for ordering
+                type: 'image', url: downloadURL, storagePath: storagePath,
+                x: initialX, y: initialY, width: displayWidth, height: displayHeight,
+                author: user ? user.uid : 'anonymous',
+                timestamp: serverTimestamp()
             };
-            newImageObject.bounds = calculateBounds(newImageObject); // Calculate bounds for selection
-
-            await sendObjectToFirestore(newImageObject); // This will add to canvasObjects via listener
+            newImageObject.bounds = calculateBounds(newImageObject);
+            await sendObjectToFirestore(newImageObject);
             showToast('Đã tải ảnh lên bảng!', 'success');
         } catch (error) {
             console.error("Error uploading image object:", error);
             showToast('Tải ảnh lên bảng thất bại.', 'error');
         } finally {
             loadingOverlay.classList.add('hidden');
-            if (imageObjectFileInput) imageObjectFileInput.value = ''; // Reset file input
+            if (imageObjectFileInput) imageObjectFileInput.value = '';
         }
     }
 
     // --- Quiz Collaboration Functions ---
-
-    /**
-     * Parses an Excel/CSV file into a structured array of quiz questions.
-     * Assumes the first column is the question, and subsequent columns are options.
-     * @param {File} file - The Excel (.xlsx, .xls) or CSV file.
-     * @returns {Promise<Array<Object>>} - An array of question objects.
-     */
     async function parseQuizFile(file) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -579,53 +656,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 }); // Get data as array of arrays
-
+                const json = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
                 const questions = [];
-                // Assuming first row is header or can be skipped, start from second row (index 1)
-                // Or, if no header, start from index 0
-                const startRowIndex = 0; // Adjust if your file has a header row
-
+                const startRowIndex = 0;
                 for (let i = startRowIndex; i < json.length; i++) {
                     const row = json[i];
-                    if (!row || row.length === 0 || !String(row[0]).trim()) {
-                        continue; // Skip empty rows or rows with empty question
-                    }
-
-                    const questionText = String(row[0]).trim(); // First column is question
+                    if (!row || row.length === 0 || !String(row[0]).trim()) { continue; }
+                    const questionText = String(row[0]).trim();
                     const options = [];
-                    // Start from index 1 for options
                     for (let j = 1; j < row.length; j++) {
                         const optionText = String(row[j]).trim();
-                        if (optionText) { // Only add non-empty options
-                            options.push(optionText);
-                        }
+                        if (optionText) { options.push(optionText); }
                     }
-
-                    if (options.length === 0) {
-                        console.warn(`Question "${questionText}" has no options and will be skipped.`);
-                        continue; // Skip questions without any options
-                    }
-
+                    if (options.length === 0) continue;
                     questions.push({
                         question: questionText,
-                        options: options, // Array of answer options
-                        hostSelectedAnswerIndex: null // Host will select this later
+                        options: options,
+                        hostSelectedAnswerIndex: null
                     });
                 }
                 resolve(questions);
             };
-            reader.onerror = (error) => {
-                reject(error);
-            };
+            reader.onerror = (error) => { reject(error); };
             reader.readAsArrayBuffer(file);
         });
     }
 
-    /**
-     * Renders the current quiz question and its options.
-     * Updates UI based on whether the user is the host or a participant.
-     */
     function renderQuizQuestion() {
         if (!currentQuizData || !currentQuizData.questions || currentQuizData.questions.length === 0) {
             currentQuestionText.textContent = 'Không có câu hỏi nào.';
@@ -637,60 +693,42 @@ document.addEventListener('DOMContentLoaded', () => {
             finishQuizCollaborationBtn.classList.add('hidden');
             return;
         }
-
         const totalQuestions = currentQuizData.questions.length;
         const currentQ = currentQuizData.questions[currentQuestionIndex];
-
         currentQuestionText.textContent = `${currentQuestionIndex + 1}. ${currentQ.question}`;
-        quizOptionsArea.innerHTML = ''; // Clear previous options
-
+        quizOptionsArea.innerHTML = '';
         currentQ.options.forEach((option, index) => {
             const optionDiv = document.createElement('div');
             optionDiv.className = `p-3 border rounded-lg cursor-pointer transition duration-200 ease-in-out flex items-center gap-2`;
             optionDiv.innerHTML = `<span class="font-bold text-[#FF69B4]">${String.fromCharCode(65 + index)}.</span> <span>${option}</span>`;
             optionDiv.dataset.index = index;
-
-            // Highlight selected answer by host
             if (currentQ.hostSelectedAnswerIndex === index) {
                 optionDiv.classList.add('bg-[#FFB6C1]', 'border-[#FF69B4]', 'font-semibold');
             } else {
                 optionDiv.classList.add('bg-white', 'border-gray-200', 'hover:bg-pink-50');
             }
-
-            // Allow all users to click, but only host's click updates shared state
             optionDiv.addEventListener('click', async () => {
-                if (isHost) { // Only host's selection affects the shared state
-                    // Host selects an answer
+                if (isHost) {
                     if (currentQ.hostSelectedAnswerIndex === index) {
-                        // Deselect if already selected
                         currentQ.hostSelectedAnswerIndex = null;
                     } else {
                         currentQ.hostSelectedAnswerIndex = index;
                     }
-                    // Update in Firestore to sync with all participants
                     const quizSessionRef = doc(db, 'study_rooms', roomId, 'quizSession', 'current');
                     await updateDoc(quizSessionRef, {
-                        questions: currentQuizData.questions // Send the entire updated questions array
+                        questions: currentQuizData.questions
                     });
-                    // UI will be re-rendered by the onSnapshot listener
                 } else {
-                    // For participants, clicking only provides local visual feedback (optional)
-                    // You could add a temporary visual highlight here for the participant
-                    // For now, we'll just show a toast that only the host can select
                     showToast('Chỉ chủ phòng mới có thể chọn đáp án chính thức.', 'info');
                 }
             });
             quizOptionsArea.appendChild(optionDiv);
         });
-
-        // Update navigation buttons and progress
         prevQuestionBtn.disabled = currentQuestionIndex === 0 || !isHost;
         nextQuestionBtn.disabled = currentQuestionIndex === totalQuestions - 1 || !isHost;
         questionCounter.textContent = `${currentQuestionIndex + 1} / ${totalQuestions}`;
         const progress = ((currentQuestionIndex + 1) / totalQuestions) * 100;
         collaborativeQuizProgressFill.style.width = `${progress}%`;
-
-        // Show/hide finish button
         if (isHost && currentQuestionIndex === totalQuestions - 1) {
             finishQuizCollaborationBtn.classList.remove('hidden');
         } else {
@@ -698,377 +736,364 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /**
-     * Listens to real-time changes in the collaborative quiz session in Firestore.
-     */
     function listenToQuizSessionChanges() {
-        if (quizSessionUnsubscribe) quizSessionUnsubscribe(); // Unsubscribe from previous listener if any
-
+        if (quizSessionUnsubscribe) quizSessionUnsubscribe();
         const quizSessionRef = doc(db, 'study_rooms', roomId, 'quizSession', 'current');
-
         quizSessionUnsubscribe = onSnapshot(quizSessionRef, (docSnapshot) => {
             if (docSnapshot.exists() && docSnapshot.data().questions && docSnapshot.data().questions.length > 0) {
                 const quizSessionData = docSnapshot.data();
                 currentQuizData = quizSessionData;
                 currentQuestionIndex = quizSessionData.currentQuestionIndex || 0;
-                isHost = (auth.currentUser && auth.currentUser.uid === quizSessionData.hostId);
-
-                // Show quiz display and hide upload area
+                isHost = (user && user.uid === quizSessionData.hostId);
                 quizUploadArea.classList.add('hidden');
                 collaborativeQuizDisplay.classList.remove('hidden');
-                collaborativeQuizModal.classList.remove('hidden'); // Ensure modal is visible if data exists
-
+                collaborativeQuizModal.classList.remove('hidden');
                 renderQuizQuestion();
             } else {
-                // No active quiz session or session was cleared
                 currentQuizData = null;
                 currentQuestionIndex = 0;
-                isHost = false; // Reset host status
+                isHost = false;
                 collaborativeQuizDisplay.classList.add('hidden');
-                quizUploadArea.classList.remove('hidden'); // Show upload area
-
-                // Adjust UI based on whether current user is potential host
-                if (auth.currentUser) { // Any authenticated user can upload a quiz, so show the upload area
-                    uploadQuizFileArea.classList.remove('hidden'); // Make the drag/drop area visible
-                    startQuizCollaborationBtn.disabled = true; // Disable until file is parsed
-                    quizFileInfo.classList.add('hidden'); // Hide file info initially
-                } else {
-                    // Not authenticated, cannot upload
-                    uploadQuizFileArea.classList.add('hidden');
-                    quizFileInfo.classList.add('hidden');
-                    quizUploadArea.querySelector('p').textContent = 'Vui lòng đăng nhập để tải lên file câu hỏi.';
-                }
+                quizUploadArea.classList.remove('hidden');
+                startQuizCollaborationBtn.disabled = true;
+                quizFileInfo.classList.add('hidden');
             }
         });
+    }
+
+    // Quiz file input change
+    if (quizFileInput) {
+        quizFileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) {
+                quizFileInfo.classList.add('hidden');
+                startQuizCollaborationBtn.disabled = true;
+                return;
+            }
+            quizFileNameSpan.textContent = file.name;
+            quizFileInfo.classList.remove('hidden');
+            startQuizCollaborationBtn.disabled = true;
+            try {
+                const questions = await parseQuizFile(file);
+                quizQuestionCountInfo.textContent = `Tìm thấy ${questions.length} câu hỏi.`;
+                currentQuizData = {
+                    questions: questions,
+                    hostId: user ? user.uid : null,
+                    hostName: user ? user.displayName || 'Ẩn danh' : 'Ẩn danh',
+                    currentQuestionIndex: 0,
+                    quizTitle: file.name.split('.').slice(0, -1).join('.')
+                };
+                startQuizCollaborationBtn.disabled = false;
+            } catch (error) {
+                showToast('Lỗi khi đọc file. Vui lòng kiểm tra định dạng.', 'error');
+                quizFileInfo.classList.add('hidden');
+                startQuizCollaborationBtn.disabled = true;
+            }
+        });
+    }
+
+    // Bắt đầu collaborative quiz
+    if (startQuizCollaborationBtn) {
+        startQuizCollaborationBtn.addEventListener('click', async () => {
+            if (!currentQuizData || !roomId) {
+                showToast('Không thể bắt đầu. Vui lòng tải file.', 'error');
+                return;
+            }
+            loadingOverlay.classList.remove('hidden');
+            try {
+                const quizSessionRef = doc(db, 'study_rooms', roomId, 'quizSession', 'current');
+                currentQuizData.hostId = user ? user.uid : null;
+                currentQuizData.hostName = user ? user.displayName || 'Ẩn danh' : 'Ẩn danh';
+                await setDoc(quizSessionRef, currentQuizData);
+                showToast('Đã bắt đầu phiên trắc nghiệm!', 'success');
+            } catch (error) {
+                showToast('Lỗi khi bắt đầu phiên trắc nghiệm.', 'error');
+            } finally {
+                loadingOverlay.classList.add('hidden');
+            }
+        });
+    }
+
+    // Chuyển câu hỏi
+    if (prevQuestionBtn) {
+        prevQuestionBtn.addEventListener('click', async () => {
+            if (isHost && currentQuizData && currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                const quizSessionRef = doc(db, 'study_rooms', roomId, 'quizSession', 'current');
+                await updateDoc(quizSessionRef, { currentQuestionIndex: currentQuestionIndex });
+            }
+        });
+    }
+    if (nextQuestionBtn) {
+        nextQuestionBtn.addEventListener('click', async () => {
+            if (isHost && currentQuizData && currentQuestionIndex < currentQuizData.questions.length - 1) {
+                currentQuestionIndex++;
+                const quizSessionRef = doc(db, 'study_rooms', roomId, 'quizSession', 'current');
+                await updateDoc(quizSessionRef, { currentQuestionIndex: currentQuestionIndex });
+            }
+        });
+    }
+    // Hoàn thành và lưu quiz
+    if (finishQuizCollaborationBtn) {
+        finishQuizCollaborationBtn.addEventListener('click', async () => {
+            if (!currentQuizData || !roomId || !isHost) {
+                showToast('Không thể hoàn thành. Vui lòng đảm bảo bạn là chủ phòng và có dữ liệu.', 'error');
+                return;
+            }
+            if (!user || user.isAnonymous) {
+                showToast('Vui lòng đăng nhập để lưu bài trắc nghiệm vào thư viện cá nhân của bạn.', 'warning');
+                return;
+            }
+            loadingOverlay.classList.remove('hidden');
+            showToast('Đang lưu bài trắc nghiệm vào thư viện...', 'info');
+            const userId = user.uid;
+            const userName = user.displayName || 'Ẩn danh';
+            const finalQuestions = currentQuizData.questions.map(q => ({
+                question: q.question,
+                answers: q.options, // Đổi 'options' thành 'answers' để nhất quán
+                correctAnswerIndex: q.hostSelectedAnswerIndex
+            }));
+            const quizToSave = {
+                title: currentQuizData.quizTitle || 'Trắc nghiệm từ phòng học',
+                questions: finalQuestions,
+                questionCount: finalQuestions.length, // Thêm số lượng câu hỏi
+                createdAt: serverTimestamp(),
+                userId: userId, // Sử dụng 'userId' để nhất quán với thư viện
+            };
+            try {
+                // Sửa: Lưu vào collection 'quiz_sets' thay vì 'quizzes'
+                await addDoc(collection(db, 'quiz_sets'), quizToSave);
+                showToast('Đã lưu bài trắc nghiệm vào thư viện!', 'success');
+                await updateDoc(doc(db, 'study_rooms', roomId, 'quizSession', 'current'), {
+                    questions: [],
+                    currentQuestionIndex: 0,
+                    hostId: null,
+                    hostName: null
+                });
+            } catch (error) {
+                showToast('Lỗi khi lưu bài trắc nghiệm.', 'error');
+            } finally {
+                loadingOverlay.classList.add('hidden');
+                currentQuizData = null;
+                currentQuestionIndex = 0;
+                isHost = false;
+                startQuizCollaborationBtn.disabled = true;
+                quizFileInfo.classList.add('hidden');
+                collaborativeQuizDisplay.classList.add('hidden');
+                quizUploadArea.classList.remove('hidden');
+            }
+        });
+    }
+
+    // Hiển thị modal collaborative quiz khi bấm nút "Cùng nhau đánh đề"
+    if (startCollaborativeQuizBtn && collaborativeQuizModal) {
+        startCollaborativeQuizBtn.addEventListener('click', () => {
+            collaborativeQuizModal.classList.remove('hidden');
+            // Reset modal state mỗi lần mở
+            quizUploadArea.classList.remove('hidden');
+            collaborativeQuizDisplay.classList.add('hidden');
+            quizFileInfo.classList.add('hidden');
+            startQuizCollaborationBtn.disabled = true;
+            if (quizFileInput) quizFileInput.value = '';
+            if (quizQuestionCountInfo) quizQuestionCountInfo.textContent = '';
+        });
+
+        // Thêm sự kiện click cho khu vực kéo thả file quiz
+        if (quizUploadArea && quizFileInput) {
+            quizUploadArea.addEventListener('click', () => quizFileInput.click());
+        }
+    }
+    // Đóng modal khi bấm nút đóng
+    if (closeCollaborativeQuizModalBtn && collaborativeQuizModal) {
+        closeCollaborativeQuizModalBtn.addEventListener('click', () => {
+            collaborativeQuizModal.classList.add('hidden');
+        });
+    }
+
+    // Lắng nghe quiz session khi vào phòng
+    if (roomId) {
+        listenToQuizSessionChanges();
     }
 
     // --- Room Management ---
     async function initRoom() {
-        loadingOverlay.classList.remove('hidden');
-        const urlParams = new URLSearchParams(window.location.search);
-        roomId = urlParams.get('id');
+        if(loadingOverlay) loadingOverlay.classList.remove('hidden');
+        try {
+            // Lấy roomId từ URL, KHÔNG tạo mới nếu không có
+            const urlParams = new URLSearchParams(window.location.search);
+            roomId = urlParams.get('id');
 
-        if (roomId) {
-            const roomRef = doc(db, 'study_rooms', roomId);
-            const roomSnap = await getDoc(roomRef);
-            if (!roomSnap.exists()) {
-                alert("Phòng không tồn tại!");
+            if (roomId) {
+                const roomRef = doc(db, 'study_rooms', roomId);
+                const roomSnap = await getDoc(roomRef);
+                if (!roomSnap.exists()) {
+                    alert("Phòng không tồn tại!");
+                    window.location.href = 'index.html';
+                    return;
+                }
+                onSnapshot(roomRef, (docSnap) => {
+                    const roomData = docSnap.data();
+                    if (roomData && roomData.background && roomData.background.url !== currentBackgroundUrl) {
+                        currentBackgroundUrl = roomData.background.url;
+                        backgroundImage.src = currentBackgroundUrl;
+                        backgroundImage.onload = () => redrawCanvas();
+                    } else if (!roomData.background && currentBackgroundUrl) {
+                        currentBackgroundUrl = null;
+                        redrawCanvas();
+                    }
+                });
+            } else {
+                // Không tạo phòng mới tự động nữa
+                alert("Bạn cần truy cập phòng học qua đường dẫn hợp lệ!");
                 window.location.href = 'index.html';
                 return;
             }
-            // Listen for room-level changes (like background)
-            onSnapshot(roomRef, (docSnap) => {
-                const roomData = docSnap.data();
-                if (roomData && roomData.background) {
-                    if (roomData.background.url !== currentBackgroundUrl) {
-                        currentBackgroundUrl = roomData.background.url;
-                        currentBackgroundType = roomData.background.fileType;
-                        backgroundImage.src = currentBackgroundUrl;
-                        backgroundImage.onload = () => redrawCanvas();
-                    }
-                } else if (currentBackgroundUrl) {
-                    currentBackgroundUrl = null;
-                    currentBackgroundType = null;
-                    redrawCanvas();
+
+            if(roomIdDisplay) roomIdDisplay.textContent = roomId;
+
+            // Fetch initial drawings
+            const drawingsRef = collection(db, 'study_rooms', roomId, 'drawings');
+            const q = query(drawingsRef, orderBy("timestamp", "asc"));
+            const querySnapshot = await getDocs(q);
+            canvasObjects = querySnapshot.docs.map(docSnap => {
+                const data = docSnap.data();
+                const obj = { id: docSnap.id, ...data };
+                if (obj.type === 'image') {
+                    const img = new Image();
+                    img.crossOrigin = "anonymous";
+                    img.src = obj.url;
+                    obj.imgElement = img;
+                    img.onload = () => redrawCanvas();
                 }
+                return obj;
             });
 
-        } else {
-            const newRoomRef = doc(collection(db, 'study_rooms'));
-            roomId = newRoomRef.id;
-            await setDoc(newRoomRef, { // Use setDoc for initial creation
-                createdAt: serverTimestamp(),
-                owner: auth.currentUser ? auth.currentUser.uid : 'anonymous'
-            });
-            window.history.replaceState({}, '', `?id=${roomId}`);
-        }
-
-        roomIdDisplay.textContent = roomId;
-
-        // Fetch initial drawings
-        const drawingsRef = collection(db, 'study_rooms', roomId, 'drawings');
-        const q = query(drawingsRef, orderBy("timestamp", "asc"));
-        const querySnapshot = await getDocs(q); // Use getDocs for initial load
-        canvasObjects = querySnapshot.docs.map(docSnap => {
-            const data = docSnap.data();
-            const obj = { id: docSnap.id, ...data };
-            if (obj.type === 'image') {
-                const img = new Image();
-                img.crossOrigin = "anonymous"; // Important for CORS if image is from different origin
-                img.src = obj.url;
-                obj.imgElement = img; // Store the image element
-                img.onload = () => redrawCanvas(); // Redraw once image is loaded
-            }
-            return obj;
-        });
-
-        saveHistory();
-        redrawCanvas();
-        listenToRoomChanges();
-        listenToQuizSessionChanges(); // Listen for quiz session changes
-        loadingOverlay.classList.add('hidden');
-    }
-
-    // --- Event Listeners ---
-    window.addEventListener('resize', resizeCanvas);
-    canvas.addEventListener('mousedown', startAction);
-    canvas.addEventListener('mousemove', moveAction);
-    canvas.addEventListener('mouseup', endAction);
-    canvas.addEventListener('mouseleave', endAction); // End action if mouse leaves canvas
-    canvas.addEventListener('touchstart', startAction, { passive: false });
-    canvas.addEventListener('touchmove', moveAction, { passive: false });
-    canvas.addEventListener('touchend', endAction);
-
-    shareBtn.addEventListener('click', () => {
-        navigator.clipboard.writeText(window.location.href)
-            .then(() => showToast('Đã sao chép link phòng!', 'success'))
-            .catch(() => showToast('Lỗi khi sao chép link.', 'error'));
-    });
-    
-    toolBtns.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const tool = btn.dataset.tool;
-            if (!tool) return;
-
-            document.querySelector('.tool-btn.active')?.classList.remove('active');
-            btn.classList.add('active');
-            currentTool = tool;
-            selectedObject = null; // Deselect object when changing tool
-            canvas.style.cursor = (currentTool === 'select') ? 'grab' : 'crosshair';
+            saveHistory();
             redrawCanvas();
-        });
-    });
 
-    clearCanvasBtn.addEventListener('click', clearAllDrawings);
-    undoBtn.addEventListener('click', undo);
-    redoBtn.addEventListener('click', redo);
-
-    // New image object upload listeners
-    if (uploadImageObjectBtn && imageObjectFileInput) {
-        uploadImageObjectBtn.addEventListener('click', () => imageObjectFileInput.click());
-        imageObjectFileInput.addEventListener('change', handleImageObjectUpload);
+            // Khởi tạo các listener mới
+            listenToRoomChanges();
+            listenToQuizSessionChanges();
+            listenToMembers();
+            listenToChat();
+        } catch (err) {
+            console.error('Lỗi khi khởi tạo phòng:', err);
+            showToast('Lỗi khi tải phòng học.', 'error');
+        } finally {
+            if(loadingOverlay) loadingOverlay.classList.add('hidden');
+        }
     }
 
-    // --- Quiz Collaboration Event Listeners ---
-    // Event listener to open the collaborative quiz modal
-    startCollaborativeQuizBtn.addEventListener('click', async () => {
-        collaborativeQuizModal.classList.remove('hidden');
-        // The listenToQuizSessionChanges will handle showing the correct area (upload vs display)
-        // based on whether a quiz session already exists.
-    });
-
-    closeCollaborativeQuizModalBtn.addEventListener('click', () => {
-        // Close the modal and reset its state
-        collaborativeQuizModal.classList.add('hidden');
-        // Reset quiz state when modal is closed
-        currentQuizData = null;
-        currentQuestionIndex = 0;
-        isHost = false;
-        quizFileInfo.classList.add('hidden');
-        startQuizCollaborationBtn.disabled = true; // Disable start button until file is parsed
-        collaborativeQuizDisplay.classList.add('hidden');
-        quizUploadArea.classList.remove('hidden'); // Show upload area by default for next open
-        if (quizSessionUnsubscribe) { // Unsubscribe from quiz session if modal is closed
-            quizSessionUnsubscribe();
-            quizSessionUnsubscribe = null;
-        }
-    });
-
-    // Event listener for when a file is selected via the input
-    quizFileInput.addEventListener('change', async (e) => {
-        const file = e.target.files[0];
-        if (!file) {
-            quizFileInfo.classList.add('hidden');
-            startQuizCollaborationBtn.disabled = true;
-            return;
-        }
-
-        quizFileNameSpan.textContent = file.name;
-        quizFileInfo.classList.remove('hidden');
-        startQuizCollaborationBtn.disabled = true; // Disable until parsed
-
-        try {
-            const questions = await parseQuizFile(file);
-            quizQuestionCountInfo.textContent = `Tìm thấy ${questions.length} câu hỏi.`;
-            currentQuizData = {
-                questions: questions, // Parsed questions
-                hostId: auth.currentUser ? auth.currentUser.uid : null, // Mark current user as host
-                hostName: auth.currentUser ? auth.currentUser.displayName || 'Ẩn danh' : 'Ẩn danh',
-                currentQuestionIndex: 0,
-                quizTitle: file.name.split('.').slice(0, -1).join('.') // Use filename as default title
-            };
-            startQuizCollaborationBtn.disabled = false; // Enable start button
-        } catch (error) {
-            console.error("Error parsing quiz file:", error);
-            showToast('Lỗi khi đọc file. Vui lòng kiểm tra định dạng.', 'error');
-            quizFileInfo.classList.add('hidden');
-            startQuizCollaborationBtn.disabled = true;
-        }
-    });
-
-    // Event listeners for drag and drop functionality
-    // Handle drag over event
-    uploadQuizFileArea.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        uploadQuizFileArea.classList.add('border-[#FF69B4]', 'bg-pink-100');
-    });
-
-    // Handle drag leave event
-    uploadQuizFileArea.addEventListener('dragleave', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        uploadQuizFileArea.classList.remove('border-[#FF69B4]', 'bg-pink-100');
-    });
-
-    uploadQuizFileArea.addEventListener('drop', (e) => {
-        // Handle dropped files
-        e.preventDefault();
-        e.stopPropagation();
-        uploadQuizFileArea.classList.remove('border-[#FF69B4]', 'bg-pink-100');
-        const files = e.dataTransfer.files;
-        if (files.length > 0) {
-            quizFileInput.files = files; // Assign dropped files to the input
-            quizFileInput.dispatchEvent(new Event('change')); // Trigger change event
-        }
-    });
-
-    // Handle click on the drag/drop area to open file dialog
-    uploadQuizFileArea.addEventListener('click', () => {
-        quizFileInput.click();
-    });
-
-    // Event listener for the "Start Quiz Collaboration" button
-    // This button is only visible to the host after a file is uploaded and parsed.
-    startQuizCollaborationBtn.addEventListener('click', async () => {
-        if (!currentQuizData || !roomId) { // Removed !isHost check here, as anyone can start
-            showToast('Không thể bắt đầu. Vui lòng tải file.', 'error');
-            return;
-        }
-        loadingOverlay.classList.remove('hidden');
-        try {
-            const quizSessionRef = doc(db, 'study_rooms', roomId, 'quizSession', 'current');
-            // When starting, the current user becomes the host of this quiz session
-            currentQuizData.hostId = auth.currentUser ? auth.currentUser.uid : null;
-            currentQuizData.hostName = auth.currentUser ? auth.currentUser.displayName || 'Ẩn danh' : 'Ẩn danh';
-            await setDoc(quizSessionRef, currentQuizData); // Set initial quiz data
-            showToast('Đã bắt đầu phiên trắc nghiệm!', 'success');
-            // UI will be updated by the onSnapshot listener
-        } catch (error) {
-            console.error("Error starting quiz collaboration:", error);
-            showToast('Lỗi khi bắt đầu phiên trắc nghiệm.', 'error');
-        } finally {
-            loadingOverlay.classList.add('hidden');
-        }
-    });
-
-    // Event listener for the "Previous Question" button
-    // Navigate questions
-    prevQuestionBtn.addEventListener('click', async () => {
-        if (isHost && currentQuizData && currentQuestionIndex > 0) {
-            currentQuestionIndex--;
-            const quizSessionRef = doc(db, 'study_rooms', roomId, 'quizSession', 'current');
-            await updateDoc(quizSessionRef, { currentQuestionIndex: currentQuestionIndex });
-        }
-    });
-
-    // Event listener for the "Next Question" button
-    nextQuestionBtn.addEventListener('click', async () => {
-        if (isHost && currentQuizData && currentQuestionIndex < currentQuizData.questions.length - 1) {
-            currentQuestionIndex++;
-            const quizSessionRef = doc(db, 'study_rooms', roomId, 'quizSession', 'current');
-            await updateDoc(quizSessionRef, { currentQuestionIndex: currentQuestionIndex });
-        }
-    });
-
-    // Finish and Save Quiz
-    // This button is only visible to the host on the last question.
-    finishQuizCollaborationBtn.addEventListener('click', async () => {
-        if (!currentQuizData || !roomId || !isHost) {
-            showToast('Không thể hoàn thành. Vui lòng đảm bảo bạn là chủ phòng và có dữ liệu.', 'error');
-            return;
-        }
-
-        // Ensure the user is not anonymous if they want to save to their personal library
-        if (!auth.currentUser || auth.currentUser.isAnonymous) {
-            showToast('Vui lòng đăng nhập để lưu bài trắc nghiệm vào thư viện cá nhân của bạn.', 'warning');
-            return;
-        }
-
-        loadingOverlay.classList.remove('hidden');
-        showToast('Đang lưu bài trắc nghiệm vào thư viện...', 'info');
-
-        const userId = auth.currentUser.uid;
-        const userName = auth.currentUser.displayName || 'Ẩn danh';
-
-        // Map questions to the final format, including the host-selected correct answer
-        const finalQuestions = currentQuizData.questions.map(q => ({
-            question: q.question,
-            options: q.options,
-            correctAnswerIndex: q.hostSelectedAnswerIndex // The host's selected answer becomes the correct one
-        }));
-
-        const quizToSave = {
-            title: currentQuizData.quizTitle || 'Trắc nghiệm từ phòng học',
-            description: `Bài trắc nghiệm được tạo và chọn đáp án bởi ${userName} trong phòng học.`, // Description for the saved quiz
-            questions: finalQuestions,
-            createdAt: new Date(),
-            createdBy: userId,
-            authorName: userName,
-            isPublic: false // Default to private, can be changed in editor later
-        };
-
-        try {
-            await addDoc(collection(db, 'quizzes'), quizToSave);
-            showToast('Đã lưu bài trắc nghiệm vào thư viện!', 'success');
-
-            // Clear the quiz session in the room after saving
-            await updateDoc(doc(db, 'study_rooms', roomId, 'quizSession', 'current'), {
-                questions: [], // Clear questions
-                currentQuestionIndex: 0,
-                hostId: null,
-                hostName: null
-            });
-            // UI will be reset by the onSnapshot listener
-        } catch (error) {
-            console.error("Error saving quiz to library:", error);
-            showToast('Lỗi khi lưu bài trắc nghiệm.', 'error');
-        } finally {
-            loadingOverlay.classList.add('hidden');
-            // Reset local state after saving
-            currentQuizData = null;
-            currentQuestionIndex = 0;
-            isHost = false;
-            startQuizCollaborationBtn.disabled = true;
-            quizFileInfo.classList.add('hidden');
-            collaborativeQuizDisplay.classList.add('hidden');
-            quizUploadArea.classList.remove('hidden');
-        }
-    });
-
+    // --- Main Execution Flow (Cập nhật để tích hợp) ---
     function main() {
-        // Hiển thị loading ngay lập tức
-        loadingOverlay.classList.remove('hidden');
-
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                // Nếu người dùng đã đăng nhập (bằng tài khoản hoặc ẩn danh), tiến hành tải phòng
+        if(loadingOverlay) loadingOverlay.classList.remove('hidden');
+        onAuthStateChanged(auth, async (authenticatedUser) => {
+            if (authenticatedUser) {
+                user = authenticatedUser; // Gán người dùng vào biến toàn cục
                 console.log("User is authenticated:", user.uid);
-                resizeCanvas();
-                initRoom(); // initRoom sẽ ẩn loading khi hoàn tất
+                // **INTEGRATION**: Tham gia phòng và đăng ký sự kiện rời phòng
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlRoomId = urlParams.get('id');
+                if (urlRoomId) {
+                    roomId = urlRoomId; // chỉ gán roomId từ URL 1 lần duy nhất
+                    await joinRoomAsMember();
+                    window.addEventListener('beforeunload', leaveRoomAsMember);
+                    if (canvas) resizeCanvas();
+                    await initRoom();
+                } else {
+                    alert("Bạn cần truy cập phòng học qua đường dẫn hợp lệ!");
+                    window.location.href = 'index.html';
+                }
             } else {
-                // Nếu chưa có người dùng, thực hiện đăng nhập ẩn danh
                 console.log("No user found, signing in anonymously...");
                 signInAnonymously(auth)
                     .catch((error) => {
                         console.error("Anonymous sign-in failed:", error);
-                        loadingOverlay.innerHTML = `<p class="text-red-500 text-center">Lỗi xác thực. Vui lòng tải lại trang.</p>`;
+                        if(loadingOverlay) loadingOverlay.innerHTML = `<p class=\"text-red-500 text-center\">Lỗi xác thực. Vui lòng tải lại trang.</p>`;
                         showToast('Lỗi xác thực. Không thể tải phòng học.', 'error');
+                        if(loadingOverlay) loadingOverlay.classList.add('hidden');
                     });
-                // onAuthStateChanged sẽ tự động được gọi lại sau khi đăng nhập thành công,
-                // và luồng xử lý sẽ rơi vào điều kiện if (user) ở trên.
+                // onAuthStateChanged sẽ tự động được gọi lại sau khi đăng nhập ẩn danh thành công
             }
         });
+    }
+
+    // --- Đảm bảo chatForm luôn có event listener và không bị gắn trùng ---
+    if (chatForm) {
+        chatForm.onsubmit = null;
+        chatForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!chatInput.value.trim() || !user || !roomId) return;
+            try {
+                await addDoc(collection(db, 'study_rooms', roomId, 'messages'), {
+                    type: 'chat',
+                    text: chatInput.value.trim(),
+                    uid: user.uid,
+                    displayName: user.displayName || user.email || 'Khách',
+                    createdAt: serverTimestamp()
+                });
+                chatInput.value = '';
+            } catch (err) {
+                showToast('Không gửi được tin nhắn.', 'error');
+            }
+        });
+    }
+
+    // --- Đảm bảo các nút toolbar luôn có event listener ---
+    if (undoBtn) {
+        undoBtn.onclick = undo;
+    }
+    if (redoBtn) {
+        redoBtn.onclick = redo;
+    }
+    if (clearCanvasBtn) {
+        clearCanvasBtn.onclick = clearAllDrawings;
+    }
+    if (uploadImageObjectBtn && imageObjectFileInput) {
+        uploadImageObjectBtn.onclick = () => imageObjectFileInput.click();
+        imageObjectFileInput.onchange = handleImageObjectUpload;
+    }
+    if (toolBtns && toolBtns.length) {
+        toolBtns.forEach(btn => {
+            btn.onclick = () => {
+                currentTool = btn.dataset.tool;
+                toolBtns.forEach(b => b.classList.remove('bg-[#FFB6C1]'));
+                btn.classList.add('bg-[#FFB6C1]');
+                // Cập nhật tuỳ chọn màu/nét đứt/nét liền cho từng tool
+                if (toolOptions[currentTool]) {
+                    if (colorPicker) colorPicker.value = toolOptions[currentTool].color || '#000000';
+                    if (lineWidth) lineWidth.value = toolOptions[currentTool].width || 2;
+                }
+                canvas.style.cursor = (currentTool === 'select') ? 'grab' : 'crosshair';
+            };
+        });
+    }
+    // Thay đổi màu/nét đứt/nét liền cho từng tool
+    if (colorPicker) {
+        colorPicker.oninput = (e) => {
+            if (toolOptions[currentTool]) {
+                toolOptions[currentTool].color = e.target.value;
+            }
+        };
+    }
+    if (lineWidth) {
+        lineWidth.oninput = (e) => {
+            if (toolOptions[currentTool]) {
+                toolOptions[currentTool].width = parseInt(e.target.value, 10);
+            }
+        };
+    }
+
+    // --- Đảm bảo các sự kiện chỉ được gán một lần ---
+    // (Ví dụ: sự kiện cho chatForm, các nút toolbar đã được đảm bảo ở trên)
+    // --- Tránh gán lại sự kiện cho canvas ---
+    if (canvas) {
+        canvas.onmousedown = startAction;
+        canvas.onmousemove = moveAction;
+        canvas.onmouseup = endAction;
+        canvas.ontouchstart = startAction;
+        canvas.ontouchmove = moveAction;
+        canvas.ontouchend = endAction;
     }
 
     main();

@@ -67,7 +67,7 @@
                         <h3 class="text-xl font-bold text-gray-800">Tạo Trắc Nghiệm</h3>
                         <p class="text-gray-500 mt-2">Biến file Excel/CSV của bạn thành một bài kiểm tra tương tác.</p>
                     </button>
-                    <a href="study-room.html" id="selectStudyRoom" class="group bg-white rounded-lg shadow-lg p-8 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 block">
+                    <a href="#" id="selectStudyRoom" class="group bg-white rounded-lg shadow-lg p-8 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 block">
                         <i class="fas fa-users text-5xl text-blue-400 mb-4 transition-transform group-hover:scale-110"></i>
                         <h3 class="text-xl font-bold text-gray-800">Đánh đề</h3>
                         <p class="text-gray-500 mt-2">Tạo phòng học nhóm và cùng nhau giải đề trên bảng trắng.</p>
@@ -227,10 +227,55 @@
     </div>
 
     <div id="toast-container"></div>
-    
+
+    <div id="joinRoomModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-md relative">
+            <button type="button" id="closeJoinRoomModalBtn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700"><i class="fas fa-times text-2xl"></i></button>
+            <h2 class="text-2xl font-bold text-center mb-6 text-[#FF69B4]">Vào phòng học</h2>
+            <input type="text" id="joinRoomIdInput" placeholder="Nhập mã phòng (Room ID)" class="w-full px-4 py-2 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] mb-4">
+            <button type="button" id="joinRoomBtn" class="w-full px-6 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition">Vào phòng</button>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script type="module" src="app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const selectStudyRoom = document.getElementById('selectStudyRoom');
+    const joinRoomModal = document.getElementById('joinRoomModal');
+    const closeJoinRoomModalBtn = document.getElementById('closeJoinRoomModalBtn');
+    const joinRoomBtn = document.getElementById('joinRoomBtn');
+    const joinRoomIdInput = document.getElementById('joinRoomIdInput');
+    const myStudyRoomsList = document.getElementById('my-study-rooms-list');
+
+    const joinRoomById = (id) => {
+        const roomId = id ? id.trim() : '';
+        if (roomId) {
+            window.location.href = `study-room.html?id=${encodeURIComponent(roomId)}`;
+        } else if (joinRoomIdInput) {
+            joinRoomIdInput.classList.add('border-red-400');
+            joinRoomIdInput.focus();
+        }
+    };
+
+    if (selectStudyRoom) {
+        selectStudyRoom.addEventListener('click', (e) => {
+            e.preventDefault();
+            joinRoomModal.classList.remove('hidden');
+            joinRoomIdInput.value = '';
+            joinRoomIdInput.classList.remove('border-red-400');
+            joinRoomIdInput.focus();
+        });
+    }
+    if (closeJoinRoomModalBtn) closeJoinRoomModalBtn.addEventListener('click', () => joinRoomModal.classList.add('hidden'));
+    if (joinRoomBtn) joinRoomBtn.addEventListener('click', () => joinRoomById(joinRoomIdInput.value));
+    if (joinRoomIdInput) joinRoomIdInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') joinRoomById(joinRoomIdInput.value);
+    });
+
+});
+</script>
 
 </body>
 </html>
