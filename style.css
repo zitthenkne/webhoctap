@@ -14,6 +14,15 @@ body {
     overflow: hidden;
 }
 
+/* Progress bar for collaborative quiz modal */
+.collaborative-quiz-progress-bar {
+    background-color: #e9e9e9;
+    border-radius: 9999px;
+    height: 8px;
+    width: 100%;
+    overflow: hidden;
+}
+
 #progressFill {
     height: 100%;
     background: #FF69B4;
@@ -24,6 +33,12 @@ body {
 
 @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
+/* Tool button active state for study room */
+.tool-btn.active {
+    background-color: #FFB6C1;
+    color: white;
+}
+
 /* Hợp nhất animation để có hiệu ứng đồng nhất trên toàn trang */
 .fade-in { animation: fadeIn 0.5s ease-out forwards; }
 
@@ -32,7 +47,7 @@ body {
     position: fixed;
     top: 20px;
     right: 20px;
-    z-index: 1000;
+    z-index: 1000; /* Ensure toast is on top */
     display: flex;
     flex-direction: column;
     align-items: flex-end;

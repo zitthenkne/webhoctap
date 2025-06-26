@@ -27,6 +27,7 @@ const saveBtnPreQuiz = document.getElementById('saveBtn-preQuiz');
 const questionCountInfo = document.getElementById('question-count-info');
 const selectCreateQuizBtn = document.getElementById('selectCreateQuiz');
 const selectGpaCalculatorBtn = document.getElementById('selectGpaCalculator');
+const selectStudyRoomBtn = document.getElementById('selectStudyRoom');
 const calculateGpaBtn = document.getElementById('calculate-gpa-btn');
 const gpaResultArea = document.getElementById('gpa-result-area');
 const downloadTemplateBtn = document.getElementById('download-template-btn');
@@ -60,6 +61,9 @@ function showContent(targetId, title = 'Dashboard') {
     // CẬP NHẬT: Gọi hàm loadAndDisplayStats khi vào trang Thống kê
     if (targetId === 'statsContent') {
         loadAndDisplayStats();
+    }
+    if (targetId === 'myStudyRoomsContent') {
+        loadAndDisplayMyStudyRooms();
     }
     if (targetId === 'publicLibraryContent') {
         loadAndDisplayPublicLibrary();
@@ -488,6 +492,71 @@ async function loadAndDisplayStats() {
     }
 }
 
+// NEW: Function to load and display user's study rooms
+async function loadAndDisplayMyStudyRooms() {
+    const user = auth.currentUser;
+    const myStudyRoomsListContainer = document.getElementById('my-study-rooms-list');
+    myStudyRoomsListContainer.innerHTML = `<div class="text-gray-500 text-center">Đang tải phòng học của bạn...</div>`;
+
+    if (!user) {
+        myStudyRoomsListContainer.innerHTML = '<p class="text-center text-gray-500">Vui lòng <a href="#" id="login-link-study-room" class="text-[#FF69B4] underline">đăng nhập</a> để xem các phòng học của bạn.</p>';
+        document.getElementById('login-link-study-room').onclick = (e) => { e.preventDefault(); toggleAuthModal(); };
+        return;
+    }
+
+    try {
+        const q = query(collection(db, "study_rooms"), where("owner", "==", user.uid), orderBy("createdAt", "desc"));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            myStudyRoomsListContainer.innerHTML = '<p class="text-gray-500 text-center col-span-full">Bạn chưa tạo phòng học nào. Hãy tạo một phòng mới!</p>';
+            return;
+        }
+
+        myStudyRoomsListContainer.innerHTML = ''; // Clear loading message
+        querySnapshot.forEach((docSnap) => {
+            const roomData = docSnap.data();
+            const roomId = docSnap.id;
+            const card = document.createElement('div');
+            card.className = 'bg-white rounded-lg shadow-md p-4 flex flex-col';
+            card.innerHTML = `
+                <div class="flex-grow">
+                    <h3 class="text-lg font-bold text-gray-700 truncate" title="${roomId}">Phòng: ${roomId.substring(0, 8)}...</h3>
+                    <p class="text-sm text-gray-500 mt-2">Tạo lúc: ${roomData.createdAt ? new Date(roomData.createdAt.toDate()).toLocaleString() : 'N/A'}</p>
+                </div>
+                <div class="mt-4 flex flex-col gap-2">
+                    <a href="study-room.html?id=${roomId}" class="w-full text-center px-4 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition text-sm">Vào phòng</a>
+                    <button data-id="${roomId}" class="delete-study-room-btn w-full text-center px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition text-xs">Xóa phòng</button>
+                </div>
+            `;
+            myStudyRoomsListContainer.appendChild(card);
+        });
+
+    } catch (e) {
+        console.error("Lỗi tải phòng học của người dùng: ", e);
+        myStudyRoomsListContainer.innerHTML = '<p class="text-red-500 text-center">Lỗi tải phòng học của bạn.</p>';
+    }
+}
+
+// NEW: Function to delete a study room and its subcollection
+async function deleteStudyRoom(roomIdToDelete) {
+    if (!confirm(`Bạn có chắc muốn xóa phòng học "${roomIdToDelete}"? Hành động này sẽ xóa tất cả dữ liệu trong phòng và không thể hoàn tác.`)) {
+        return;
+    }
+    try {
+        const drawingsRef = collection(db, 'study_rooms', roomIdToDelete, 'drawings');
+        const drawingsSnapshot = await getDocs(drawingsRef);
+        const deletePromises = drawingsSnapshot.docs.map(doc => deleteDoc(doc.ref));
+        await Promise.all(deletePromises);
+        await deleteDoc(doc(db, "study_rooms", roomIdToDelete));
+        showToast("Đã xóa phòng học thành công!", 'success');
+        loadAndDisplayMyStudyRooms(); // Refresh the list
+    } catch (e) {
+        showToast("Xóa phòng học thất bại! Lỗi: " + e.message, 'error');
+        console.error("Lỗi khi xóa phòng học: ", e);
+    }
+}
+
 function setupEventListeners() {
     closeModalBtn.addEventListener('click', toggleAuthModal);
     loginBtn.addEventListener('click', handleLogin);
@@ -498,6 +567,12 @@ function setupEventListeners() {
     saveBtnPreQuiz.addEventListener('click', saveOnly);
     menuToggleBtn.addEventListener('click', () => sidebar.classList.toggle('hidden'));
     selectCreateQuizBtn.addEventListener('click', () => showContent('createQuizContent', 'Tạo trắc nghiệm'));
+    
+    // Correctly handle the "Đánh đề" button click
+    selectStudyRoomBtn.addEventListener('click', (event) => {
+        event.preventDefault(); // Prevent the default <a> tag behavior
+        showContent('myStudyRoomsContent', 'Phòng học của tôi');
+    });
     selectGpaCalculatorBtn.addEventListener('click', () => showContent('gpaCalculatorContent', 'Tính điểm hệ 4'));
     calculateGpaBtn.addEventListener('click', calculateGPA);
     downloadTemplateBtn.addEventListener('click', downloadTemplate);
@@ -509,6 +584,21 @@ function setupEventListeners() {
             showContent(targetId, title);
         });
     });
+
+    // Use event delegation for buttons inside the dynamic content panels
+    document.body.addEventListener('click', (event) => {
+        // Button to create a new study room from the "My Rooms" panel
+        if (event.target.id === 'create-new-study-room-btn') {
+            window.location.href = 'study-room.html'; // Redirect to create a new room
+        }
+
+        // Delete button for a specific study room
+        if (event.target.classList.contains('delete-study-room-btn')) {
+            const roomIdToDelete = event.target.dataset.id;
+            deleteStudyRoom(roomIdToDelete);
+        }
+    });
+
     const libraryContainer = document.getElementById('libraryContent');
     libraryContainer.addEventListener('click', (event) => {
         const target = event.target.closest('button');

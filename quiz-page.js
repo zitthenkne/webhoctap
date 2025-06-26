@@ -18,12 +18,16 @@ document.addEventListener('DOMContentLoaded', () => {
     let quizData = null;          // Dữ liệu bộ đề từ Firestore
     let questions = [];           // Các câu hỏi cho phiên làm bài hiện tại
     let originalQuestions = [];   // Toàn bộ câu hỏi gốc
-    let currentIndex = 0;         // Vị trí câu hỏi hiện tại
+    let currentIndex = 0;         // Vị trí câu hỏi hiện tại (CHO QUIZ)
     let userAnswers = [];         // Mảng lưu câu trả lời của người dùng
     let score = 0;                // Điểm số
     let quizStartTime;            // Thời điểm bắt đầu
     let quizTimerInterval;        // Biến cho đồng hồ đếm giờ
     let quizMode = 'normal';      // 'normal' hoặc 'practice'
+    let _allFlashcardQuestions = []; // Lưu tất cả câu hỏi với trạng thái _isKnown cho toàn bộ phiên
+    let flashcardQuestions = [];     // Bộ câu hỏi đang hiển thị (lượt đầu hoặc ôn tập)
+    let reviewQueue = [];            // Các câu hỏi được đánh dấu "chưa thuộc" trong lượt hiện tại
+    let currentFlashcardIndex = 0;   // Vị trí thẻ hiện tại cho chế độ Flashcard
     
     // Hàm tải dữ liệu bộ đề từ Firestore dựa vào ID trên URL
     async function loadQuizData() {
@@ -69,74 +73,132 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // === LOGIC FLASHCARD (ĐÃ NÂNG CẤP) ===
-    function startFlashcardMode() {
-        if (!quizData || !quizData.questions || quizData.questions.length === 0) {
-            flashcardContainer.innerHTML = `<p class="text-red-500">Lỗi: Không có dữ liệu câu hỏi để tạo flashcard.</p>`;
+    // === LOGIC FLASHCARD (NÂNG CẤP MỚI) ===
+
+    // Bắt đầu chế độ flashcard, có tùy chọn xáo trộn
+    function startFlashcardMode(shuffle = false) {
+        if (!originalQuestions || originalQuestions.length === 0) {
+            flashcardContainer.innerHTML = `<p class="text-red-500 text-center">Lỗi: Không có dữ liệu câu hỏi để tạo flashcard.</p>`;
             return;
         }
-        quizLanding.classList.add('hidden');
+
+        // Initialize _allFlashcardQuestions with _isKnown state
+        _allFlashcardQuestions = originalQuestions.map(q => ({ ...q, _isKnown: false }));
+        
+        // Set the initial set of questions for this pass
+        flashcardQuestions = [..._allFlashcardQuestions]; 
+
+        if (shuffle) {
+            // Thuật toán xáo trộn Fisher-Yates
+            for (let i = flashcardQuestions.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [flashcardQuestions[i], flashcardQuestions[j]] = [flashcardQuestions[j], flashcardQuestions[i]];
+            }
+            showToast('Đã xáo trộn thứ tự thẻ!', 'info');
+        }
+
+        currentFlashcardIndex = 0;
+        reviewQueue = []; // Reset review queue for a new session
         flashcardContainer.classList.remove('hidden');
-        currentIndex = 0;
+        quizLanding.classList.add('hidden'); // Hide landing page
         renderFlashcards();
+        addFlashcardKeyListeners(); // Thêm lắng nghe sự kiện bàn phím
     }
 
+    // Dựng giao diện cho flashcard
     function renderFlashcards() {
-        let currentCardIndex = currentIndex;
         flashcardContainer.innerHTML = `
             <div class="flashcard-viewer mx-auto max-w-2xl">
-                <div id="flashcard" class="flashcard-scene">
+                <div id="flashcard" class="flashcard-scene" title="Nhấn để lật thẻ (hoặc dùng phím Space)">
                     <div class="flashcard-inner">
                         <div id="flashcard-front" class="flashcard-face flashcard-front"></div>
                         <div id="flashcard-back" class="flashcard-face flashcard-back"></div>
                     </div>
                 </div>
                 <div class="flex justify-between items-center mt-6">
-                    <button id="prev-card-btn" class="px-4 py-2 bg-[#D8BFD8] text-white rounded-lg hover:bg-opacity-80 transition disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2">
+                    <button id="prev-card-btn" class="px-4 py-2 bg-[#D8BFD8] text-white rounded-lg hover:bg-opacity-80 transition disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2" title="Phím ←">
                         <i class="fas fa-arrow-left"></i> Trước
                     </button>
                     <p id="card-progress" class="text-gray-600 font-medium"></p>
-                    <button id="next-card-btn" class="px-4 py-2 bg-[#D8BFD8] text-white rounded-lg hover:bg-opacity-80 transition disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2">
+                    <button id="next-card-btn" class="px-4 py-2 bg-[#D8BFD8] text-white rounded-lg hover:bg-opacity-80 transition disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2" title="Phím →">
                         Sau <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
+                <div id="mark-buttons" class="mt-4 flex justify-center gap-4 hidden">
+                    <button id="mark-known-btn" class="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition flex items-center gap-2" title="Phím Enter">
+                        <i class="fas fa-check"></i> Thuộc
+                    </button>
+                    <button id="mark-unknown-btn" class="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition flex items-center gap-2" title="Phím U">
+                        <i class="fas fa-times"></i> Chưa thuộc
+                    </button>
+                </div>
+                <div class="mt-4 flex justify-center items-center gap-3 text-sm text-gray-500">
+                    <kbd class="px-2 py-1 border rounded bg-gray-100">←</kbd> 
+                    <kbd class="px-2 py-1 border rounded bg-gray-100">→</kbd> để chuyển, 
+                    <kbd class="px-2 py-1 border rounded bg-gray-100">Space</kbd> để lật
+                    <span id="mark-keys-hint" class="hidden">, <kbd class="px-2 py-1 border rounded bg-gray-100">Enter</kbd> thuộc, <kbd class="px-2 py-1 border rounded bg-gray-100">U</kbd> chưa thuộc</span>
+                </div>
+                <div class="mt-8 border-t pt-6 flex justify-center flex-wrap gap-4">
+                     <button id="shuffle-cards-btn" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex items-center gap-2">
+                        <i class="fas fa-random"></i> Xáo trộn
+                    </button>
+                    <button id="restart-flashcards-btn" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition flex items-center gap-2">
+                        <i class="fas fa-redo"></i> Học lại lượt này
+                    </button>
+                    <button id="exit-flashcard-btn" class="px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition flex items-center gap-2">
+                        <i class="fas fa-times-circle"></i> Thoát
                     </button>
                 </div>
             </div>
         `;
+        // Session complete message (hidden by default)
+        flashcardContainer.insertAdjacentHTML('beforeend', `
+            <div id="flashcard-session-complete" class="hidden mt-8 p-6 bg-blue-100 text-blue-800 rounded-lg text-center">
+                <h3 class="text-xl font-bold mb-3">Hoàn thành phiên học Flashcard!</h3>
+                <p class="mb-4">Bạn đã ôn tập tất cả các thẻ.</p>
+                <div class="flex justify-center gap-4">
+                    <button id="restart-all-flashcards-btn" class="px-4 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition">
+                        <i class="fas fa-redo"></i> Học lại từ đầu
+                    </button>
+                    <button id="exit-flashcard-final-btn" class="px-4 py-2 bg-gray-400 text-white rounded-lg hover:bg-gray-500 transition">
+                        <i class="fas fa-times-circle"></i> Thoát
+                    </button>
+                </div>
+            </div>
+        `);
 
-        const flashcard = document.getElementById('flashcard');
-        const prevBtn = document.getElementById('prev-card-btn');
-        const nextBtn = document.getElementById('next-card-btn');
+        // Gắn sự kiện cho các nút điều khiển
+        document.getElementById('flashcard').addEventListener('click', flipCard);
+        document.getElementById('next-card-btn').addEventListener('click', () => moveToNextFlashcard(false)); // Pass false for not marking
+        document.getElementById('prev-card-btn').addEventListener('click', showPrevCard);
+        document.getElementById('shuffle-cards-btn').addEventListener('click', () => startFlashcardMode(true));
+        document.getElementById('restart-flashcards-btn').addEventListener('click', () => startFlashcardMode(false));
+        document.getElementById('exit-flashcard-btn').addEventListener('click', exitFlashcardMode);
 
-        // Sự kiện lật thẻ khi click
-        flashcard.addEventListener('click', () => {
-            flashcard.querySelector('.flashcard-inner').classList.toggle('is-flipped');
-        });
+        // New mark buttons
+        document.getElementById('mark-known-btn').addEventListener('click', () => markCard(true));
+        document.getElementById('mark-unknown-btn').addEventListener('click', () => markCard(false));
+        document.getElementById('restart-all-flashcards-btn').addEventListener('click', () => startFlashcardMode(false));
+        document.getElementById('exit-flashcard-final-btn').addEventListener('click', exitFlashcardMode);
 
-        // Sự kiện cho nút "Sau"
-        nextBtn.addEventListener('click', () => {
-            if (currentCardIndex < quizData.questions.length - 1) {
-                currentCardIndex++;
-                showCard(currentCardIndex);
-            }
-        });
-
-        // Sự kiện cho nút "Trước"
-        prevBtn.addEventListener('click', () => {
-            if (currentCardIndex > 0) {
-                currentCardIndex--;
-                showCard(currentCardIndex);
-            }
-        });
-
-        showCard(currentCardIndex); // Hiển thị thẻ đầu tiên
+        showCard(currentFlashcardIndex); // Hiển thị thẻ đầu tiên
     }
 
+    // Hiển thị nội dung của một thẻ cụ thể
     function showCard(index) {
-        const cardData = quizData.questions[index];
+        const cardData = flashcardQuestions[index];
         const front = document.getElementById('flashcard-front');
         const back = document.getElementById('flashcard-back');
         const progress = document.getElementById('card-progress');
         const flashcardInner = document.querySelector('.flashcard-inner');
+        const markButtons = document.getElementById('mark-buttons');
+        const markKeysHint = document.getElementById('mark-keys-hint');
+        const sessionCompleteMessage = document.getElementById('flashcard-session-complete');
+
+        if (!front || !back || !progress || !flashcardInner || !markButtons || !markKeysHint || !sessionCompleteMessage) return; // Đảm bảo các phần tử tồn tại
+
+        markButtons.classList.add('hidden'); // Hide mark buttons
+        markKeysHint.classList.add('hidden'); // Hide mark keys hint
 
         flashcardInner.classList.remove('is-flipped'); // Reset trạng thái lật khi chuyển thẻ
 
@@ -148,14 +210,177 @@ document.addEventListener('DOMContentLoaded', () => {
             <p class="text-gray-700">${cardData.explanation || 'Không có giải thích.'}</p>
         `;
 
-        progress.textContent = `Thẻ ${index + 1} / ${quizData.questions.length}`;
+        progress.textContent = `Thẻ ${index + 1} / ${flashcardQuestions.length}`;
 
         // Vô hiệu hóa nút nếu ở đầu hoặc cuối danh sách
         document.getElementById('prev-card-btn').disabled = index === 0;
-        document.getElementById('next-card-btn').disabled = index === quizData.questions.length - 1;
+        document.getElementById('next-card-btn').disabled = index === flashcardQuestions.length - 1;
     }
 
-    // === LOGIC LÀM BÀI KIỂM TRA (GIAO DIỆN CŨ) ===
+    // === CÁC HÀM HỖ TRỢ FLASHCARD ===
+    let isCardFlipped = false; // Track if the current card is flipped
+
+    // Lật thẻ và hiển thị/ẩn các nút đánh dấu
+    function flipCard() {
+        const flashcardInner = document.querySelector('.flashcard-inner');
+        const markButtons = document.getElementById('mark-buttons');
+        const markKeysHint = document.getElementById('mark-keys-hint');
+
+        if (flashcardInner) {
+            flashcardInner.classList.toggle('is-flipped');
+            isCardFlipped = flashcardInner.classList.contains('is-flipped');
+
+            if (isCardFlipped) {
+                markButtons.classList.remove('hidden'); // Show mark buttons
+                markKeysHint.classList.remove('hidden'); // Show mark keys hint
+                // Disable navigation buttons when flipped, forcing user to mark
+                document.getElementById('prev-card-btn').disabled = true;
+                document.getElementById('next-card-btn').disabled = true;
+            } else {
+                markButtons.classList.add('hidden'); // Hide mark buttons
+                markKeysHint.classList.add('hidden'); // Hide mark keys hint
+                // Re-enable navigation buttons if not flipped
+                document.getElementById('prev-card-btn').disabled = currentFlashcardIndex === 0;
+                document.getElementById('next-card-btn').disabled = currentFlashcardIndex === flashcardQuestions.length - 1;
+            }
+        }
+    }
+
+    // Đánh dấu thẻ là thuộc/chưa thuộc và chuyển sang thẻ tiếp theo
+    function markCard(isKnown) {
+        const currentCard = flashcardQuestions[currentFlashcardIndex];
+        
+        // Find the original question in _allFlashcardQuestions and update its state
+        const originalCardIndex = _allFlashcardQuestions.findIndex(q => q.question === currentCard.question && q.correctAnswerIndex === currentCard.correctAnswerIndex);
+        if (originalCardIndex !== -1) {
+            _allFlashcardQuestions[originalCardIndex]._isKnown = isKnown;
+        }
+
+        // Add to reviewQueue if unknown and not already there
+        if (!isKnown && !reviewQueue.includes(currentCard)) {
+            reviewQueue.push(currentCard);
+        }
+
+        moveToNextFlashcard(true); // Marked, so move to next
+    }
+
+    // Chuyển đến thẻ flashcard tiếp theo hoặc bắt đầu phiên ôn tập
+    function moveToNextFlashcard(marked = false) {
+        // If card was flipped and not marked, force marking or flip back
+        if (isCardFlipped && !marked) {
+            showToast('Vui lòng đánh dấu thẻ này là "Thuộc" hoặc "Chưa thuộc" trước khi chuyển.', 'warning');
+            return;
+        }
+
+        currentFlashcardIndex++;
+        if (currentFlashcardIndex < flashcardQuestions.length) {
+            showCard(currentFlashcardIndex);
+        } else {
+            // End of current pass
+            const cardsToReviewNextPass = _allFlashcardQuestions.filter(q => !q._isKnown);
+
+            if (cardsToReviewNextPass.length > 0) {
+                showToast(`Bắt đầu ôn tập lại ${cardsToReviewNextPass.length} thẻ chưa thuộc!`, 'info');
+                flashcardQuestions = cardsToReviewNextPass;
+                currentFlashcardIndex = 0;
+                reviewQueue = []; // Clear review queue for the next pass
+                showCard(currentFlashcardIndex);
+            } else {
+                // All cards are now known after review, or no cards left
+                endFlashcardSession();
+            }
+        }
+    }
+
+    // Hiển thị thẻ flashcard trước đó
+    function showPrevCard() {
+        if (currentFlashcardIndex > 0) {
+            currentFlashcardIndex--;
+            showCard(currentFlashcardIndex);
+        }
+    }
+
+    // Kết thúc phiên flashcard và hiển thị thông báo hoàn thành
+    function endFlashcardSession() {
+        const markButtons = document.getElementById('mark-buttons');
+        const markKeysHint = document.getElementById('mark-keys-hint');
+        const sessionCompleteMessage = document.getElementById('flashcard-session-complete');
+        const flashcardScene = document.getElementById('flashcard');
+        const navButtons = document.querySelector('.flex.justify-between.items-center.mt-6');
+        const controlButtons = document.querySelector('.mt-8.border-t.pt-6');
+
+        if (markButtons) markButtons.classList.add('hidden');
+        if (markKeysHint) markKeysHint.classList.add('hidden');
+        if (flashcardScene) flashcardScene.classList.add('hidden');
+        if (navButtons) navButtons.classList.add('hidden');
+        if (controlButtons) controlButtons.classList.add('hidden');
+
+        if (sessionCompleteMessage) sessionCompleteMessage.classList.remove('hidden');
+    }
+
+    // Thoát chế độ flashcard
+    function exitFlashcardMode() {
+        flashcardContainer.classList.add('hidden');
+        quizLanding.classList.remove('hidden');
+        removeFlashcardKeyListeners(); // Gỡ bỏ lắng nghe sự kiện bàn phím để tránh xung đột
+        // Reset all flashcard related states for a clean start next time
+        _allFlashcardQuestions = [];
+        flashcardQuestions = [];
+        currentFlashcardIndex = 0;
+        reviewQueue = [];
+        isCardFlipped = false;
+    }
+
+    // Xử lý sự kiện nhấn phím
+    function handleFlashcardKeyPress(e) {
+        // Không xử lý nếu đang gõ trong input/textarea
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
+        // If card is flipped, prioritize marking keys
+        if (isCardFlipped) {
+            switch (e.key) {
+                case 'Enter':
+                    e.preventDefault(); // Prevent default Enter behavior (e.g., form submission)
+                    document.getElementById('mark-known-btn')?.click();
+                    break;
+                case 'u': // 'U' key for unknown
+                case 'U':
+                    e.preventDefault();
+                    document.getElementById('mark-unknown-btn')?.click();
+                    break;
+                // Allow space to flip back if needed, but marking is preferred
+                case ' ':
+                    e.preventDefault();
+                    flipCard(); // Allow flipping back
+                    break;
+            }
+        } else { // Card is not flipped, allow navigation and flipping
+            switch (e.key) {
+                case 'ArrowLeft':
+                    document.getElementById('prev-card-btn')?.click();
+                    break;
+                case 'ArrowRight':
+                    document.getElementById('next-card-btn')?.click();
+                    break;
+                case ' ': // Space to flip
+                case 'ArrowUp':
+                case 'ArrowDown':
+                    e.preventDefault();
+                    flipCard();
+                    break;
+            }
+        }
+    }
+
+    function addFlashcardKeyListeners() {
+        document.addEventListener('keydown', handleFlashcardKeyPress);
+    }
+
+    function removeFlashcardKeyListeners() {
+        document.removeEventListener('keydown', handleFlashcardKeyPress);
+    }
+
+    // === LOGIC LÀM BÀI KIỂM TRA ===
 
     function startQuizMode(questionsArray, mode = 'normal') {
         quizMode = mode;
@@ -315,6 +540,40 @@ document.addEventListener('DOMContentLoaded', () => {
         const percentage = questions.length > 0 ? ((score / questions.length) * 100).toFixed(1) : 0;
         const showPracticeButton = score < questions.length;
 
+        const detailedResultsHtml = questions.map((q, index) => {
+            const userAnswerIndex = userAnswers[index];
+            const isCorrect = userAnswerIndex === q.correctAnswerIndex;
+            const userAnswerText = userAnswerIndex !== null ? q.answers[userAnswerIndex] : 'Chưa trả lời';
+            const correctAnswerText = q.answers[q.correctAnswerIndex];
+
+            return `
+                <div class="mb-8 p-6 rounded-lg ${isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}">
+                    <div class="flex items-center mb-3">
+                        ${isCorrect ? 
+                            '<i class="fas fa-check-circle text-green-500 text-xl mr-3"></i>' : 
+                            '<i class="fas fa-times-circle text-red-500 text-xl mr-3"></i>'
+                        }
+                        <h4 class="text-lg font-semibold text-gray-800">Câu ${index + 1}: ${q.question}</h4>
+                    </div>
+                    <div class="ml-8">
+                        <p class="text-gray-700 mb-2">
+                            <span class="font-medium">Câu trả lời của bạn:</span> 
+                            <span class="${isCorrect ? 'text-green-600' : 'text-red-600'}">${userAnswerText}</span>
+                            ${!isCorrect && userAnswerIndex !== null ? `<i class="fas fa-times ml-1"></i>` : ''}
+                        </p>
+                        <p class="text-gray-700 mb-2">
+                            <span class="font-medium">Đáp án đúng:</span> 
+                            <span class="text-green-600">${correctAnswerText}</span> <i class="fas fa-check ml-1"></i>
+                        </p>
+                        <div class="mt-4 p-3 bg-gray-100 rounded-md">
+                            <h5 class="font-bold text-gray-800">Giải thích:</h5>
+                            <p class="text-gray-700">${q.explanation || 'Không có giải thích.'}</p>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
         resultsSection.innerHTML = `
             <div class="bg-white rounded-lg shadow-lg p-8 text-center fade-in">
                 <h2 class="text-3xl font-bold text-[#FF69B4]">Hoàn thành!</h2>
@@ -322,6 +581,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="my-8">
                     <p class="text-5xl font-bold text-[#FF69B4]">${percentage}%</p>
                     <p class="text-lg text-gray-700 mt-2">Đúng ${score}/${questions.length} câu</p>
+                    <p class="text-sm text-gray-500 mt-1">Bạn đã trả lời ${questions.length - userAnswers.filter(a => a === null).length} / ${questions.length} câu</p>
                 </div>
                 <div class="text-md text-gray-500">
                     <i class="fas fa-clock mr-2"></i> Thời gian: ${formatTime(totalTime)}
@@ -339,9 +599,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     </a>
                 </div>
             </div>
+
+            <div class="bg-white rounded-lg shadow-lg p-8 mt-8 fade-in">
+                <h3 class="text-2xl font-bold text-[#FF69B4] mb-6 text-center">Chi tiết kết quả</h3>
+                <div id="detailed-results-list">
+                    ${detailedResultsHtml}
+                </div>
+            </div>
         `;
 
-        document.getElementById('restartQuizBtn').addEventListener('click', () => startQuizMode(originalQuestions, 'normal'));
+        document.getElementById('restartQuizBtn').addEventListener('click', () => startQuizMode([...originalQuestions], 'normal'));
         if (showPracticeButton) {
             document.getElementById('practiceIncorrectBtn').addEventListener('click', startIncorrectPracticeMode);
         }
@@ -407,7 +674,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Gắn trình xử lý sự kiện cho các nút
-    startNowBtn.addEventListener('click', () => startQuizMode(originalQuestions, 'normal'));
+    startNowBtn.addEventListener('click', () => startQuizMode([...originalQuestions], 'normal'));
     startFlashcardBtn.addEventListener('click', startFlashcardMode);
 
     // Tải dữ liệu bộ đề ngay khi trang được tải

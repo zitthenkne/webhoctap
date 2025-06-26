@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phòng học Zitthenkne</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="flex flex-col h-screen bg-gray-100 text-gray-700 text-sm">
+    <!-- Header -->
+    <header class="bg-white shadow-sm p-2 flex justify-between items-center flex-shrink-0 z-20">
+        <div class="flex items-center gap-4">
+            <a href="index.html" class="px-4 py-2 text-gray-600 hover:text-pink-500 transition rounded-lg hover:bg-gray-100">
+                <i class="fas fa-arrow-left mr-2"></i>Quay lại
+            </a>
+            <div class="text-sm text-gray-500">
+                ID Phòng: <span id="room-id-display" class="font-mono font-bold text-gray-700">...</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <button id="start-collaborative-quiz-btn" class="px-4 py-2 bg-[#D8BFD8] text-white rounded-lg hover:bg-opacity-80 transition text-sm flex items-center gap-2 shadow-sm hover:shadow-md">
+                <i class="fas fa-users mr-1"></i> Cùng nhau đánh đề
+            </button>
+            <button id="share-room-btn" class="px-4 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition text-sm flex items-center gap-2 shadow-sm hover:shadow-md">
+                <i class="fas fa-share-alt"></i> Chia sẻ
+            </button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex relative">
+        <!-- Toolbar -->
+        <div class="absolute top-4 left-4 bg-white/80 backdrop-blur-md rounded-lg shadow-lg p-2 flex flex-col gap-2 z-10">
+            <button data-tool="select" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition active"><i class="fas fa-mouse-pointer"></i></button>
+            <button data-tool="pen" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition"><i class="fas fa-pen"></i></button>
+            <button data-tool="line" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition"><i class="fas fa-minus"></i></button>
+            <button data-tool="eraser" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition"><i class="fas fa-eraser"></i></button>
+            <input type="color" id="color-picker" value="#FF69B4" class="w-10 h-10 p-1 border-none rounded cursor-pointer bg-white">
+            <input type="range" id="line-width" min="1" max="50" value="5" class="w-20 mx-auto my-2">
+            <button id="upload-image-object-btn" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Tải ảnh lên bảng"><i class="fas fa-image"></i></button>
+            <input type="file" id="image-object-file-input" class="hidden" accept="image/*">
+            <button id="undo-btn" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition opacity-50" disabled><i class="fas fa-undo"></i></button>
+            <button id="redo-btn" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition opacity-50" disabled><i class="fas fa-redo"></i></button>
+            <button id="clear-canvas-btn" class="tool-btn text-red-500 p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-red-100 transition"><i class="fas fa-trash"></i></button>
+        </div>
+
+        <!-- Canvas Container -->
+        <div id="canvas-container" class="flex-1 relative w-full h-full bg-white">
+            <canvas id="whiteboard" class="absolute top-0 left-0"></canvas>
+        </div>
+
+        <!-- Loading Overlay -->
+        <div id="loading-overlay" class="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
+            <div class="text-center">
+                <i class="fas fa-spinner fa-spin text-4xl text-[#FF69B4] mb-4"></i>
+                <p class="text-lg text-gray-600">Đang tải phòng học...</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Collaborative Quiz Modal -->
+    <div id="collaborative-quiz-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 hidden">
+        <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-3xl relative">
+            <button type="button" id="close-collaborative-quiz-modal-btn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700"><i class="fas fa-times text-2xl"></i></button>
+            <h2 class="text-2xl font-bold text-center mb-6 text-[#FF69B4]">Cùng nhau đánh đề</h2>
+
+            <div id="quiz-upload-area" class="mb-6">
+                <p class="text-gray-600 mb-4 text-center">Tải lên file câu hỏi để bắt đầu phiên trắc nghiệm.</p>
+                <div id="upload-quiz-file-area" class="border-2 border-dashed border-[#FFB6C1] rounded-lg p-8 text-center cursor-pointer transition duration-300 ease-in-out hover:bg-pink-50">
+                    <input type="file" id="quizFileInput" class="hidden" accept=".xlsx,.xls,.csv">
+                    <div class="flex flex-col items-center justify-center">
+                        <i class="fas fa-file-upload text-5xl text-[#FF69B4] mb-4"></i>
+                        <h4 class="text-lg font-medium text-[#FF69B4] mb-2">Kéo thả file Excel/CSV vào đây hoặc click để chọn</h4>
+                        <p class="text-sm text-gray-500">Hỗ trợ file Excel (.xlsx, .xls) hoặc CSV</p>
+                    </div>
+                </div>
+                <div id="quizFileInfo" class="mt-4 hidden text-center">
+                    <div class="inline-flex items-center justify-center bg-pink-50 p-3 rounded-lg">
+                        <i class="fas fa-file-excel text-[#FF69B4] mr-2 text-2xl"></i>
+                        <span id="quizFileName" class="font-medium text-gray-700"></span>
+                    </div>
+                    <p id="quiz-question-count-info" class="text-sm my-2 font-medium text-gray-600"></p>
+                    <button type="button" id="start-quiz-collaboration-btn" class="mt-4 px-6 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition shadow-md"><i class="fas fa-play-circle mr-2"></i> Bắt đầu làm bài</button>
+                </div>
+            </div>
+
+            <div id="collaborative-quiz-display" class="hidden">
+                <div class="collaborative-quiz-progress-bar mb-4">
+                    <div id="collaborative-quiz-progress-fill" class="h-full bg-[#FF69B4] rounded-full transition-all duration-300" style="width: 0%;"></div>
+                </div>
+                <div id="quiz-question-area" class="bg-gray-50 p-6 rounded-lg shadow-inner mb-4">
+                    <p class="text-lg font-semibold text-gray-800 mb-4" id="current-question-text"></p>
+                    <div id="quiz-options-area" class="space-y-3">
+                        <!-- Options will be rendered here -->
+                    </div>
+                </div>
+                <div class="flex justify-between items-center mt-6">
+                    <button id="prev-question-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"><i class="fas fa-arrow-left mr-2"></i> Câu trước</button>
+                    <span id="question-counter" class="font-medium text-gray-600">1 / 10</span>
+                    <button id="next-question-btn" class="px-4 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition">Câu tiếp theo <i class="fas fa-arrow-right ml-2"></i></button>
+                </div>
+                <div class="text-center mt-6">
+                    <button id="finish-quiz-collaboration-btn" class="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition shadow-md hidden"><i class="fas fa-check-circle mr-2"></i> Hoàn thành & Lưu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script type="module" src="firebase-init.js"></script>
+    <script type="module" src="utils.js"></script>
+    <script type="module" src="study-room.js"></script>
+</body>
+</html>

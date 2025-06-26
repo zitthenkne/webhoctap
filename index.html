@@ -23,32 +23,56 @@
                 <li class="mb-2"><a href="#" data-target="libraryContent" class="nav-link flex items-center p-2 rounded-lg text-gray-600 hover:bg-[#FFB6C1]/50"><i class="fas fa-book mr-3 w-5 text-center"></i><span>Thư viện</span></a></li>
                 <li class="mb-2"><a href="#" data-target="publicLibraryContent" class="nav-link flex items-center p-2 rounded-lg text-gray-600 hover:bg-[#FFB6C1]/50"><i class="fas fa-globe mr-3 w-5 text-center"></i><span>Thư viện công cộng</span></a></li>
                 <li class="mb-2"><a href="#" data-target="statsContent" class="nav-link flex items-center p-2 rounded-lg text-gray-600 hover:bg-[#FFB6C1]/50"><i class="fas fa-chart-bar mr-3 w-5 text-center"></i><span>Thống kê</span></a></li>
+                <li class="mb-2"><a href="#" data-target="myStudyRoomsContent" class="nav-link flex items-center p-2 rounded-lg text-gray-600 hover:bg-[#FFB6C1]/50"><i class="fas fa-chalkboard-teacher mr-3 w-5 text-center"></i><span>Phòng học của tôi</span></a></li>
             </ul>
         </nav>
     </aside>
 
-    <div class="flex-1 flex flex-col overflow-hidden">
-        <header class="relative z-40 bg-white/70 backdrop-blur-lg shadow-sm p-4 flex justify-between items-center border-b border-pink-100">
-             <div class="flex items-center">
-                <button type="button" id="menu-toggle-btn" class="p-2 rounded-md text-gray-600 hover:bg-pink-100 md:hidden mr-2"><i class="fas fa-bars"></i></button>
-                <h1 id="pageTitle" class="text-lg font-semibold text-gray-700 hidden md:block">Trang chủ</h1>
-             </div>
-            <div class="flex items-center">
-                <button type="button" class="p-2 rounded-full hover:bg-[#FFB6C1]/50"><i class="fas fa-bell text-gray-600"></i></button>
-                <button type="button" id="user-menu-button" class="ml-2 flex items-center"><img id="user-avatar" src="https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff" alt="User" class="w-8 h-8 rounded-full"><span id="user-name" class="ml-2 text-sm font-medium text-gray-700 hidden md:inline">Khách</span></button>
+    <div class="flex-1 flex flex-col overflow-hidden"> 
+        <!-- Top Bar - CẬP NHẬT CHO GIAO DIỆN DI ĐỘNG -->
+        <header class="bg-white shadow-sm sticky top-0 z-30">
+            <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <!-- Nút Menu cho di động -->
+                    <button id="menu-toggle-btn" class="text-gray-700 md:hidden">
+                        <i class="fas fa-bars text-2xl"></i>
+                    </button>
+                    
+                    <!-- Logo & Tên trang web (Chỉ hiển thị trên di động) -->
+                    <a href="/" class="flex items-center gap-2 md:hidden">
+                         <img src="assets/logo.png" alt="Logo" class="h-8 w-8 rounded-full">
+                         <h1 class="text-xl font-bold text-[#FF69B4]">Zitthenkne</h1>
+                    </a>
+
+                    <!-- Tiêu đề trang (Chỉ hiển thị trên máy tính) -->
+                    <h2 id="pageTitle" class="text-xl font-semibold text-gray-800 hidden md:block">Trang chủ</h2>
+                </div>
+
+                <!-- Menu người dùng (giữ nguyên của bạn) -->
+                <div id="user-menu-button" class="relative">
+                    <button class="flex items-center gap-2">
+                        <span id="user-name" class="text-gray-700 font-medium">Khách</span>
+                        <img id="user-avatar" src="https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff" class="w-8 h-8 rounded-full">
+                    </button>
+                </div>
             </div>
         </header>
 
         <main class="flex-1 overflow-x-hidden overflow-y-auto bg-[#FCE4EC] p-6">
             <div id="dashboardContent" class="content-panel fade-in">
                 <div class="text-center mb-10"><h2 class="text-3xl font-bold text-[#FF69B4]">Bạn muốn làm gì hôm nay?</h2></div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
                     <button type="button" id="selectCreateQuiz" class="group bg-white rounded-lg shadow-lg p-8 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300">
                         <i class="fas fa-file-alt text-5xl text-[#FF69B4] mb-4 transition-transform group-hover:scale-110"></i>
                         <h3 class="text-xl font-bold text-gray-800">Tạo Trắc Nghiệm</h3>
                         <p class="text-gray-500 mt-2">Biến file Excel/CSV của bạn thành một bài kiểm tra tương tác.</p>
                     </button>
-                    <button type="button" id="selectGpaCalculator" class="group bg-white rounded-lg shadow-lg p-8 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300">
+                    <a href="study-room.html" id="selectStudyRoom" class="group bg-white rounded-lg shadow-lg p-8 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 block">
+                        <i class="fas fa-users text-5xl text-blue-400 mb-4 transition-transform group-hover:scale-110"></i>
+                        <h3 class="text-xl font-bold text-gray-800">Đánh đề</h3>
+                        <p class="text-gray-500 mt-2">Tạo phòng học nhóm và cùng nhau giải đề trên bảng trắng.</p>
+                    </a>
+                    <button type="button" id="selectGpaCalculator" class="group bg-white rounded-lg shadow-lg p-8 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 lg:col-start-3">
                         <i class="fas fa-calculator text-5xl text-[#D8BFD8] mb-4 transition-transform group-hover:scale-110"></i>
                         <h3 class="text-xl font-bold text-gray-800">Tính Điểm Hệ 4</h3>
                         <p class="text-gray-500 mt-2">Quy đổi nhanh điểm số trắc nghiệm của bạn sang thang điểm 4.0.</p>
@@ -166,6 +190,18 @@
                 <div id="stats-container" class="bg-white rounded-lg shadow">
                     <h3 class="text-lg font-semibold p-6 text-gray-700">Lịch sử chi tiết</h3>
                     </div>
+            </div>
+
+            <div id="myStudyRoomsContent" class="content-panel hidden p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Phòng học của tôi</h2>
+                <div class="flex justify-end mb-4">
+                    <button id="create-new-study-room-btn" class="px-6 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition">
+                        <i class="fas fa-plus-circle mr-2"></i> Tạo phòng mới
+                    </button>
+                </div>
+                <div id="my-study-rooms-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Các phòng học của bạn sẽ được tải vào đây -->
+                </div>
             </div>
         </main>
         <footer class="bg-white/70 backdrop-blur-lg text-gray-600 text-center p-3 border-t border-pink-100 flex-shrink-0">
