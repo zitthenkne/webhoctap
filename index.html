@@ -9,46 +9,54 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="flex h-screen bg-gray-50 text-gray-700 text-sm">
-    <aside id="sidebar" class="w-64 bg-white/70 backdrop-blur-xl shadow-2xl hidden md:block flex-shrink-0 absolute md:relative z-30 h-full transition-transform duration-300 ease-in-out rounded-r-3xl border-r-4 border-pink-100" style="background: linear-gradient(135deg, #fff 80%, #ffe4ec 100%);">
-        <div class="p-6 flex items-center justify-center border-b-2 border-pink-200">
-            <div class="flex items-center gap-3">
-                <img src="assets/logo.png" alt="Zitthenkne Logo" class="w-14 h-14 rounded-full shadow-2xl border-4 border-[#FFB6C1] animate__animated animate__pulse animate__infinite">
-                <h1 class="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#FF69B4] to-[#D8BFD8] tracking-wider drop-shadow-lg whitespace-nowrap">Zitthenkne</h1>
-            </div>
+    <!-- Mobile Top Bar with Hamburger -->
+    <div class="md:hidden fixed top-0 left-0 w-full z-40 bg-white/95 shadow-lg flex items-center justify-between px-2 py-2 border-b border-pink-100 min-h-[54px]">
+        <div class="flex items-center gap-2 min-w-0">
+            <button id="menu-toggle-btn" class="text-2xl text-pink-500 focus:outline-none p-1 flex-shrink-0">
+                <i class="fas fa-bars"></i>
+            </button>
+            <a href="index.html" class="flex items-center gap-1 min-w-0">
+                <img src="assets/logo.png" alt="Zitthenkne Logo" class="w-9 h-9 rounded-full border-2 border-[#FFB6C1] shadow bg-white ml-1 hover:scale-105 transition-transform duration-200 flex-shrink-0">
+                <span class="font-bold text-[#FF69B4] text-base truncate block">Zitthenkne</span>
+            </a>
         </div>
-        <nav class="p-4">
-            <ul>
-                <li class="mb-2"><a href="#" data-target="dashboardContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm active:bg-[#FF69B4]/30"><i class="fas fa-home mr-3 w-5 text-center animate__animated animate__fadeInLeft"></i><span>Trang chủ</span></a></li>
-                <li class="mb-2"><a href="#" data-target="createQuizContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm"><i class="fas fa-plus-circle mr-3 w-5 text-center animate__animated animate__fadeInLeft"></i><span>Tạo trắc nghiệm</span></a></li>
-                <li class="mb-2"><a href="#" data-target="libraryContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm"><i class="fas fa-book mr-3 w-5 text-center animate__animated animate__fadeInLeft"></i><span>Thư viện</span></a></li>
-                <li class="mb-2"><a href="#" data-target="publicLibraryContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm"><i class="fas fa-globe mr-3 w-5 text-center animate__animated animate__fadeInLeft"></i><span>Thư viện công cộng</span></a></li>
-                <li class="mb-2"><a href="#" data-target="statsContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm"><i class="fas fa-chart-bar mr-3 w-5 text-center animate__animated animate__fadeInLeft"></i><span>Thống kê</span></a></li>
-                <li class="mb-2"><a href="#" data-target="myStudyRoomsContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm"><i class="fas fa-chalkboard-teacher mr-3 w-5 text-center animate__animated animate__fadeInLeft"></i><span>Phòng học của tôi</span></a></li>
+        <img id="user-avatar-mobile" src="https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff" class="w-9 h-9 rounded-full border-2 border-[#D8BFD8] shadow ml-1 flex-shrink-0">
+    </div>
+    <!-- Overlay for sidebar on mobile -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-20 z-30 hidden md:hidden transition-opacity duration-200"></div>
+    <aside id="sidebar" class="w-11/12 max-w-xs bg-white/90 backdrop-blur-xl shadow-2xl fixed md:relative z-40 h-full transition-transform duration-300 ease-in-out rounded-r-3xl border-r-2 border-pink-100 top-0 left-0 md:static md:translate-x-0 -translate-x-full md:rounded-none md:block">
+        <!-- Nút đóng sidebar trên mobile -->
+        <button id="sidebar-close-btn" class="md:hidden absolute top-3 right-3 text-gray-400 hover:text-pink-500 text-2xl z-50 bg-white/80 rounded-full p-1 shadow"><i class="fas fa-times"></i></button>
+        <div class="p-4 flex flex-col items-center justify-center border-b border-pink-200 gap-1">
+            <a href="index.html" class="flex flex-col items-center group">
+                <img src="assets/logo.png" alt="Zitthenkne Logo" class="w-12 h-12 rounded-full shadow-2xl border-2 border-[#FFB6C1] animate__animated animate__pulse animate__infinite group-hover:scale-105 transition-transform duration-200">
+                <h1 class="text-lg font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#FF69B4] to-[#D8BFD8] tracking-wider drop-shadow-lg whitespace-nowrap group-hover:underline mt-1">Zitthenkne</h1>
+            </a>
+            <img id="user-avatar-sidebar" src="https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff" class="w-9 h-9 rounded-full border-2 border-[#D8BFD8] shadow mt-1">
+            <span id="user-name-sidebar" class="text-gray-700 font-semibold text-sm mt-1">Khách</span>
+        </div>
+        <nav class="p-2">
+            <ul class="flex flex-col gap-2">
+                <li><a href="#" data-target="dashboardContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm active:bg-[#FF69B4]/30 text-base gap-3"><i class="fas fa-home text-xl w-7 text-center"></i><span>Trang chủ</span></a></li>
+                <li><a href="#" data-target="createQuizContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-plus-circle text-xl w-7 text-center"></i><span>Tạo trắc nghiệm</span></a></li>
+                <li><a href="#" data-target="libraryContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-book text-xl w-7 text-center"></i><span>Thư viện</span></a></li>
+                <li><a href="#" data-target="publicLibraryContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-globe text-xl w-7 text-center"></i><span>Thư viện công cộng</span></a></li>
+                <li><a href="#" data-target="statsContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-chart-bar text-xl w-7 text-center"></i><span>Thống kê</span></a></li>
+                <li><a href="#" data-target="myStudyRoomsContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-chalkboard-teacher text-xl w-7 text-center"></i><span>Phòng học của tôi</span></a></li>
             </ul>
         </nav>
     </aside>
-
-    <div class="flex-1 flex flex-col overflow-hidden"> 
+    <div class="flex-1 flex flex-col overflow-hidden pt-16 md:pt-0"> 
         <!-- Top Bar - CẬP NHẬT CHO GIAO DIỆN DI ĐỘNG -->
-        <header class="bg-white shadow-lg sticky top-0 z-30 border-b-2 border-pink-100">
+        <header class="bg-white shadow-lg sticky top-0 z-30 border-b-2 border-pink-100 hidden md:block">
             <div class="container mx-auto px-4 py-3 flex justify-between items-center">
                 <div class="flex items-center gap-4">
-                    <!-- Nút Menu cho di động -->
-                    <button id="menu-toggle-btn" class="text-gray-700 md:hidden">
-                        <i class="fas fa-bars text-2xl"></i>
-                    </button>
-                    
                     <!-- Logo & Tên trang web (Chỉ hiển thị trên di động) -->
-                    <a href="/" class="flex items-center gap-2 md:hidden">
-                         <img src="assets/logo.png" alt="Logo" class="h-10 w-10 rounded-full border-2 border-[#FFB6C1] shadow">
-                         <h1 class="text-2xl font-extrabold text-[#FF69B4]">Zitthenkne</h1>
-                    </a>
-
+                    <!-- Đã chuyển sang sidebar/mobile topbar -->
                     <!-- Tiêu đề trang (Chỉ hiển thị trên máy tính) -->
                     <h2 id="pageTitle" class="text-2xl font-bold text-gray-800 hidden md:block tracking-wide">Trang chủ</h2>
                 </div>
-
-                <!-- Menu người dùng (giữ nguyên của bạn) -->
+                <!-- Menu người dùng (desktop) -->
                 <div id="user-menu-button" class="relative">
                     <button class="flex items-center gap-2 hover:bg-pink-50 px-4 py-2 rounded-2xl transition shadow border-2 border-transparent hover:border-[#FFB6C1]">
                         <span id="user-name" class="text-gray-700 font-semibold text-lg">Khách</span>
@@ -58,24 +66,26 @@
             </div>
         </header>
 
-        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-[#FCE4EC] p-6">
+        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-[#FCE4EC] p-2 sm:p-4 md:p-6">
             <div id="dashboardContent" class="content-panel fade-in">
-                <div class="text-center mb-10"><h2 class="text-3xl font-extrabold text-[#FF69B4] drop-shadow">Bạn muốn làm gì hôm nay?</h2></div>
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-                    <button type="button" id="selectCreateQuiz" class="group bg-white rounded-2xl shadow-xl p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-[#FFB6C1]">
-                        <i class="fas fa-file-alt text-5xl text-[#FF69B4] mb-4 transition-transform group-hover:scale-110"></i>
-                        <h3 class="text-xl font-bold text-gray-800">Tạo Trắc Nghiệm</h3>
-                        <p class="text-gray-500 mt-2">Biến file Excel/CSV của bạn thành một bài kiểm tra tương tác.</p>
+                <div class="text-center mt-10 mb-8 md:mt-16 md:mb-10">
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-[#FF69B4] drop-shadow mb-2">Bạn muốn làm gì hôm nay?</h2>
+                </div>
+                <div class="grid grid-cols-1 gap-5 sm:gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-2xl md:max-w-6xl mx-auto px-3 sm:px-6">
+                    <button type="button" id="selectCreateQuiz" class="group bg-white rounded-3xl shadow-xl p-7 sm:p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-[#FFB6C1] flex flex-col items-center gap-2 mb-2 px-2 sm:px-4">
+                        <i class="fas fa-file-alt text-4xl sm:text-5xl text-[#FF69B4] mb-2 transition-transform group-hover:scale-110"></i>
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800">Tạo Trắc Nghiệm</h3>
+                        <p class="text-gray-500 mt-1 text-sm sm:text-base">Biến file Excel/CSV của bạn thành một bài kiểm tra tương tác.</p>
                     </button>
-                    <a href="#" id="selectStudyRoom" class="group bg-white rounded-2xl shadow-xl p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-blue-300 block">
-                        <i class="fas fa-users text-5xl text-blue-400 mb-4 transition-transform group-hover:scale-110"></i>
-                        <h3 class="text-xl font-bold text-gray-800">Đánh đề</h3>
-                        <p class="text-gray-500 mt-2">Tạo phòng học nhóm và cùng nhau giải đề trên bảng trắng.</p>
+                    <a href="#" id="selectStudyRoom" class="group bg-white rounded-3xl shadow-xl p-7 sm:p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-blue-300 flex flex-col items-center gap-2 mb-2 block px-2 sm:px-4">
+                        <i class="fas fa-users text-4xl sm:text-5xl text-blue-400 mb-2 transition-transform group-hover:scale-110"></i>
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800">Đánh đề</h3>
+                        <p class="text-gray-500 mt-1 text-sm sm:text-base">Tạo phòng học nhóm và cùng nhau giải đề trên bảng trắng.</p>
                     </a>
-                    <button type="button" id="selectGpaCalculator" class="group bg-white rounded-2xl shadow-xl p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-[#D8BFD8] lg:col-start-3">
-                        <i class="fas fa-calculator text-5xl text-[#D8BFD8] mb-4 transition-transform group-hover:scale-110"></i>
-                        <h3 class="text-xl font-bold text-gray-800">Tính Điểm Hệ 4</h3>
-                        <p class="text-gray-500 mt-2">Quy đổi nhanh điểm số trắc nghiệm của bạn sang thang điểm 4.0.</p>
+                    <button type="button" id="selectGpaCalculator" class="group bg-white rounded-3xl shadow-xl p-7 sm:p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-[#D8BFD8] flex flex-col items-center gap-2 mb-2 lg:col-start-1 md:col-span-2 lg:col-start-3 px-2 sm:px-4">
+                        <i class="fas fa-calculator text-4xl sm:text-5xl text-[#D8BFD8] mb-2 transition-transform group-hover:scale-110"></i>
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800">Tính Điểm Hệ 4</h3>
+                        <p class="text-gray-500 mt-1 text-sm sm:text-base">Quy đổi nhanh điểm số trắc nghiệm của bạn sang thang điểm 4.0.</p>
                     </button>
                 </div>
             </div>
@@ -204,17 +214,17 @@
                 </div>
             </div>
         </main>
-        <footer class="bg-white/80 backdrop-blur-lg text-gray-600 text-center p-3 border-t border-pink-100 flex-shrink-0 rounded-t-2xl shadow-inner">
+        <footer class="bg-white/80 backdrop-blur-lg text-gray-600 text-center p-3 border-t border-pink-100 flex-shrink-0 rounded-t-2xl shadow-inner text-xs md:text-base">
             <p>&copy; 2025 Zitthenk - Y23C - UMP.</p>
         </footer>
-        <div id="squirrel-floating" class="fixed bottom-4 right-4 z-50 cursor-pointer select-none">
+        <div id="squirrel-floating" class="fixed bottom-4 right-4 z-50 cursor-pointer select-none max-w-[60vw] sm:max-w-xs">
             <img src="assets/squirrel-pixel.png" alt="Pixel Squirrel Mascot" class="w-16 h-16 rounded-2xl shadow-xl hover:scale-110 transition-transform duration-300 bg-white/80 backdrop-blur-md border-2 border-pink-200">
-            <div id="squirrel-message" class="hidden absolute bottom-20 right-0 bg-white/90 text-pink-600 text-base font-semibold rounded-xl shadow-lg px-4 py-2 border border-pink-200 animate__animated animate__fadeInUp min-w-[120px] text-center pointer-events-none"></div>
+            <div id="squirrel-message" class="hidden absolute bottom-16 right-0 bg-white/90 text-gray-800 rounded-lg shadow-lg px-4 py-2 text-base max-w-[80vw] sm:max-w-xs z-50 border border-pink-200"></div>
         </div>
     </div>
 
-    <div id="authModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative">
+    <div id="authModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden px-2">
+        <div class="bg-white rounded-2xl shadow-2xl p-4 sm:p-8 w-full max-w-md relative">
             <button type="button" id="closeModalBtn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700"><i class="fas fa-times text-2xl"></i></button>
             <form id="auth-form">
                 <h2 class="text-2xl font-bold text-center mb-6 text-[#FF69B4]">Chào mừng bạn!</h2>
@@ -232,8 +242,8 @@
 
     <div id="toast-container"></div>
 
-    <div id="joinRoomModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
-        <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md relative">
+    <div id="joinRoomModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden px-2">
+        <div class="bg-white rounded-2xl shadow-2xl p-4 sm:p-8 w-full max-w-md relative">
             <button type="button" id="closeJoinRoomModalBtn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700"><i class="fas fa-times text-2xl"></i></button>
             <h2 class="text-2xl font-bold text-center mb-6 text-[#FF69B4]">Vào phòng học</h2>
             <input type="text" id="joinRoomIdInput" placeholder="Nhập mã phòng (Room ID)" class="w-full px-4 py-2 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] mb-4 transition-all duration-200">
@@ -278,12 +288,73 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.key === 'Enter') joinRoomById(joinRoomIdInput.value);
     });
 
+    // Hamburger menu logic for mobile
+    const menuToggleBtn = document.getElementById('menu-toggle-btn');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const sidebarCloseBtn = document.getElementById('sidebar-close-btn');
+    if (menuToggleBtn && sidebar && sidebarOverlay && sidebarCloseBtn) {
+        menuToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            sidebar.classList.remove('-translate-x-full');
+            sidebarOverlay.classList.remove('hidden');
+        });
+        function closeSidebarImmediately() {
+            sidebar.classList.add('-translate-x-full');
+            // Ẩn overlay ngay lập tức khi sidebar đóng
+            sidebarOverlay.classList.add('hidden');
+        }
+        sidebarCloseBtn.addEventListener('click', closeSidebarImmediately);
+        sidebarOverlay.addEventListener('click', closeSidebarImmediately);
+        // Đóng sidebar khi click vào bất kỳ link hoặc button trong sidebar (trừ nút đóng)
+        const sidebarNav = sidebar.querySelector('nav');
+        if (sidebarNav) {
+            sidebarNav.querySelectorAll('a, button').forEach(el => {
+                el.addEventListener('click', () => {
+                    closeSidebarImmediately();
+                });
+            });
+        }
+    }
+    // Đồng bộ avatar, tên người dùng cho sidebar/mobile
+    const userName = document.getElementById('user-name');
+    const userAvatar = document.getElementById('user-avatar');
+    const userNameSidebar = document.getElementById('user-name-sidebar');
+    const userAvatarSidebar = document.getElementById('user-avatar-sidebar');
+    const userAvatarMobile = document.getElementById('user-avatar-mobile');
+    function syncUserInfo() {
+        if (userName && userNameSidebar) userNameSidebar.textContent = userName.textContent;
+        if (userAvatar && userAvatarSidebar) userAvatarSidebar.src = userAvatar.src;
+        if (userAvatar && userAvatarMobile) userAvatarMobile.src = userAvatar.src;
+    }
+    setTimeout(syncUserInfo, 500); // Sync sau khi user info được load
+
+    // Ẩn/hiện sidebar và overlay đúng trạng thái khi resize hoặc reload
+    function updateSidebarState() {
+        if (window.innerWidth >= 768) {
+            if (sidebar) sidebar.classList.remove('-translate-x-full');
+            if (sidebarOverlay) sidebarOverlay.classList.add('hidden');
+        } else {
+            if (sidebar) sidebar.classList.add('-translate-x-full');
+            if (sidebarOverlay) sidebarOverlay.classList.add('hidden');
+        }
+    }
+    window.addEventListener('resize', updateSidebarState);
+    // Đảm bảo đúng trạng thái khi load trang
+    updateSidebarState();
 });
 </script>
 <script>
 // Squirrel mascot floating message logic
 const squirrelFloating = document.getElementById('squirrel-floating');
 const squirrelMessage = document.getElementById('squirrel-message');
+if (!squirrelMessage) {
+    // Tạo message box nếu chưa có
+    const msgDiv = document.createElement('div');
+    msgDiv.id = 'squirrel-message';
+    msgDiv.className = 'hidden absolute bottom-16 right-0 bg-white/90 text-gray-800 rounded-lg shadow-lg px-4 py-2 text-base max-w-[80vw] sm:max-w-xs z-50 border border-pink-200';
+    squirrelFloating && squirrelFloating.appendChild(msgDiv);
+}
 const squirrelMessages = [
     'Chúc bạn học tốt! 💪',
     'Cố lên nhé, bạn làm được mà! 🐿️',
@@ -299,14 +370,17 @@ const squirrelMessages = [
     'Tự tin lên nào! ✨',
     'Hôm nay bạn đã cố gắng rất nhiều rồi!'
 ];
-if (squirrelFloating && squirrelMessage) {
+if (squirrelFloating) {
+    const msgBox = document.getElementById('squirrel-message');
     squirrelFloating.addEventListener('click', () => {
         const msg = squirrelMessages[Math.floor(Math.random() * squirrelMessages.length)];
-        squirrelMessage.innerHTML = msg;
-        squirrelMessage.classList.remove('hidden');
-        setTimeout(() => {
-            squirrelMessage.classList.add('hidden');
-        }, 2200);
+        if (msgBox) {
+            msgBox.innerHTML = msg;
+            msgBox.classList.remove('hidden');
+            setTimeout(() => {
+                msgBox.classList.add('hidden');
+            }, 2200);
+        }
     });
 }
 </script>

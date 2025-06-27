@@ -84,13 +84,9 @@ document.addEventListener('DOMContentLoaded', () => {
             flashcardContainer.innerHTML = `<p class="text-red-500 text-center">Lỗi: Không có dữ liệu câu hỏi để tạo flashcard.</p>`;
             return;
         }
-
-        // Initialize _allFlashcardQuestions with _isKnown state
-        _allFlashcardQuestions = originalQuestions.map(q => ({ ...q, _isKnown: false }));
-        
-        // Set the initial set of questions for this pass
-        flashcardQuestions = [..._allFlashcardQuestions]; 
-
+        // Gán _originalIndex để đảm bảo mapping đúng khi shuffle
+        _allFlashcardQuestions = originalQuestions.map((q, idx) => ({ ...q, _isKnown: false, _originalIndex: idx }));
+        flashcardQuestions = [..._allFlashcardQuestions];
         if (shuffle) {
             // Thuật toán xáo trộn Fisher-Yates
             for (let i = flashcardQuestions.length - 1; i > 0; i--) {
@@ -99,7 +95,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             showToast('Đã xáo trộn thứ tự thẻ!', 'info');
         }
-
         currentFlashcardIndex = 0;
         reviewQueue = []; // Reset review queue for a new session
         flashcardContainer.classList.remove('hidden');
@@ -112,14 +107,13 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderFlashcards() {
         flashcardContainer.innerHTML = `
             <div class="flashcard-viewer mx-auto max-w-2xl">
-                <!-- Progress bar for flashcard session -->
                 <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden mb-4">
                     <div id="flashcard-progress-bar" class="h-full bg-[#FF69B4] transition-all duration-300" style="width:0%"></div>
                 </div>
-                <!-- Known/Unknown counter -->
                 <div class="flex justify-between items-center mb-2 text-sm text-gray-600">
                     <span id="flashcard-known-count"></span>
                     <span id="flashcard-unknown-count"></span>
+                    <span id="flashcard-progress-percent" class="ml-auto font-bold"></span>
                 </div>
                 <div id="flashcard" class="flashcard-scene" title="Nhấn để lật thẻ (hoặc dùng phím Space)">
                     <div class="flashcard-inner transition-transform duration-500">
@@ -153,6 +147,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="mt-8 border-t pt-6 flex justify-center flex-wrap gap-4">
                      <button id="shuffle-cards-btn" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition flex items-center gap-2">
                         <i class="fas fa-random"></i> Xáo trộn
+                    </button>
+                    <button id="random-card-btn" class="px-4 py-2 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 transition flex items-center gap-2">
+                        <i class="fas fa-dice"></i> Ngẫu nhiên
                     </button>
                     <button id="restart-flashcards-btn" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition flex items-center gap-2">
                         <i class="fas fa-redo"></i> Học lại lượt này
@@ -210,16 +207,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const markKeysHint = document.getElementById('mark-keys-hint');
         const sessionCompleteMessage = document.getElementById('flashcard-session-complete');
 
-        if (!front || !back || !progress || !flashcardInner || !markButtons || !markKeysHint || !sessionCompleteMessage) return; // Đảm bảo các phần tử tồn tại
+        if (!front || !back || !progress || !flashcardInner || !markButtons || !markKeysHint || !sessionCompleteMessage) return;
 
-        markButtons.classList.add('hidden'); // Hide mark buttons
-        markKeysHint.classList.add('hidden'); // Hide mark keys hint
+        markButtons.classList.add('hidden');
+        markKeysHint.classList.add('hidden');
+        flashcardInner.classList.remove('is-flipped');
 
-        flashcardInner.classList.remove('is-flipped'); // Reset trạng thái lật khi chuyển thẻ
-
+        // Hiển thị câu hỏi
         front.innerHTML = `<p class="text-2xl font-semibold">${cardData.question}</p>`;
-        
-        // FIX: Handle both 'answers' and legacy 'options' properties for backward compatibility.
+
+        // Ghi chú cá nhân (localStorage)
+        const quizId = new URLSearchParams(window.location.search).get('id') || 'default';
+        const noteKey = `flashcard_note_${quizId}_${index}`;
+        let savedNote = localStorage.getItem(noteKey) || '';
+
+        // Hiển thị đáp án, giải thích, và ô ghi chú
         const answerOptions = cardData.answers || cardData.options;
         if (!answerOptions || cardData.correctAnswerIndex === undefined || cardData.correctAnswerIndex === null) {
             back.innerHTML = `<p class="text-red-500">Lỗi dữ liệu thẻ.</p>`;
@@ -229,16 +231,55 @@ document.addEventListener('DOMContentLoaded', () => {
         const correctAnswer = answerOptions[cardData.correctAnswerIndex];
         back.innerHTML = `
             <h4 class="font-bold text-xl text-green-600 mb-4">Đáp án: ${correctAnswer || 'N/A'}</h4>
-            <p class="text-gray-700">${cardData.explanation || 'Không có giải thích.'}</p>
+            <p class="text-gray-700 mb-2">${cardData.explanation || 'Không có giải thích.'}</p>
+            <textarea id="flashcard-note" class="w-full mt-2 p-2 border rounded bg-pink-50 text-gray-700" rows="2" placeholder="Ghi chú cá nhân...">${savedNote}</textarea>
+            <div class="text-xs text-gray-400 mt-1">Ghi chú này chỉ lưu trên thiết bị của bạn.</div>
         `;
+        // Lưu ghi chú khi thay đổi
+        setTimeout(() => {
+            const noteInput = document.getElementById('flashcard-note');
+            if (noteInput) {
+                noteInput.addEventListener('input', (e) => {
+                    localStorage.setItem(noteKey, e.target.value);
+                });
+            }
+        }, 100);
 
         progress.textContent = `Thẻ ${index + 1} / ${flashcardQuestions.length}`;
-
-        // Vô hiệu hóa nút nếu ở đầu hoặc cuối danh sách
         document.getElementById('prev-card-btn').disabled = index === 0;
         document.getElementById('next-card-btn').disabled = index === flashcardQuestions.length - 1;
-
         updateFlashcardProgress();
+
+        // Hiệu ứng khi lật thẻ và đánh dấu
+        setTimeout(() => {
+            const markKnownBtn = document.getElementById('mark-known-btn');
+            const markUnknownBtn = document.getElementById('mark-unknown-btn');
+            const flashcardInner = document.querySelector('.flashcard-inner');
+            if (markKnownBtn && flashcardInner) {
+                markKnownBtn.addEventListener('click', () => {
+                    flashcardInner.classList.add('flash-success');
+                    setTimeout(() => flashcardInner.classList.remove('flash-success'), 600);
+                });
+            }
+            if (markUnknownBtn && flashcardInner) {
+                markUnknownBtn.addEventListener('click', () => {
+                    flashcardInner.classList.add('rumble');
+                    setTimeout(() => flashcardInner.classList.remove('rumble'), 400);
+                });
+            }
+            // Gợi ý khi có ghi chú
+            const noteInput = document.getElementById('flashcard-note');
+            const noteHint = document.getElementById('flashcard-note-hint');
+            if (noteInput && noteHint) {
+                noteInput.addEventListener('focus', () => {
+                    noteHint.textContent = 'Bạn có thể ghi chú mẹo nhớ, ví dụ, hoặc bất cứ điều gì!';
+                    noteHint.classList.remove('hidden');
+                });
+                noteInput.addEventListener('blur', () => {
+                    noteHint.classList.add('hidden');
+                });
+            }
+        }, 200);
     }
 
     // === CÁC HÀM HỖ TRỢ FLASHCARD ===
@@ -255,6 +296,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (progressBar) progressBar.style.width = percent + '%';
         if (knownSpan) knownSpan.textContent = `Đã thuộc: ${knownCount}`;
         if (unknownSpan) unknownSpan.textContent = `Chưa thuộc: ${unknownCount}`;
+        const percentSpan = document.getElementById('flashcard-progress-percent');
+        if (percentSpan) percentSpan.textContent = `${percent.toFixed(0)}%`;
     }
 
     // Lật thẻ và hiển thị/ẩn các nút đánh dấu
@@ -286,11 +329,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Đánh dấu thẻ là thuộc/chưa thuộc và chuyển sang thẻ tiếp theo
     function markCard(isKnown) {
         const currentCard = flashcardQuestions[currentFlashcardIndex];
-        
-        // Find the original question in _allFlashcardQuestions and update its state
-        const originalCardIndex = _allFlashcardQuestions.findIndex(q => q.question === currentCard.question && q.correctAnswerIndex === currentCard.correctAnswerIndex);
+        // Tìm đúng index trong _allFlashcardQuestions bằng cả question và index gốc
+        const quizId = new URLSearchParams(window.location.search).get('id') || 'default';
+        const originalCardIndex = _allFlashcardQuestions.findIndex((q, idx) => {
+            // So sánh cả nội dung và vị trí để tránh trùng lặp
+            return q.question === currentCard.question && q.correctAnswerIndex === currentCard.correctAnswerIndex && idx === currentCard._originalIndex;
+        });
         if (originalCardIndex !== -1) {
             _allFlashcardQuestions[originalCardIndex]._isKnown = isKnown;
+        } else {
+            // Nếu không tìm thấy theo index, fallback về so sánh nội dung
+            const fallbackIdx = _allFlashcardQuestions.findIndex(q => q.question === currentCard.question && q.correctAnswerIndex === currentCard.correctAnswerIndex);
+            if (fallbackIdx !== -1) _allFlashcardQuestions[fallbackIdx]._isKnown = isKnown;
         }
 
         // Add to reviewQueue if unknown and not already there

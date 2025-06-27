@@ -557,6 +557,15 @@ async function deleteStudyRoom(roomIdToDelete) {
     }
 }
 
+document.addEventListener('DOMContentLoaded', () => {
+    // Auto switch tab if hash is present (e.g. #libraryContent)
+    const hash = window.location.hash.replace('#', '');
+    if (hash) {
+        const navLink = document.querySelector(`.nav-link[data-target="${hash}"]`);
+        if (navLink) navLink.click();
+    }
+});
+
 function setupEventListeners() {
     closeModalBtn.addEventListener('click', toggleAuthModal);
     loginBtn.addEventListener('click', handleLogin);

@@ -59,3 +59,29 @@ body {
     box-sizing: border-box;
 }
 .fade-in { animation: fadeIn 0.5s ease-out forwards; }
+/* Flashcard nâng cấp: hiệu ứng rung khi đánh dấu sai, sáng khi đúng */
+.flashcard-inner.rumble {
+    animation: rumble 0.4s;
+}
+@keyframes rumble {
+    0% { transform: rotateY(180deg) translateX(0); }
+    20% { transform: rotateY(180deg) translateX(-8px); }
+    40% { transform: rotateY(180deg) translateX(8px); }
+    60% { transform: rotateY(180deg) translateX(-8px); }
+    80% { transform: rotateY(180deg) translateX(8px); }
+    100% { transform: rotateY(180deg) translateX(0); }
+}
+.flashcard-inner.flash-success {
+    box-shadow: 0 0 24px 4px #a7f3d0;
+    transition: box-shadow 0.3s;
+}
+.flashcard-inner.flash-note {
+    box-shadow: 0 0 16px 2px #fef08a;
+    transition: box-shadow 0.3s;
+}
+/* Ghi chú cá nhân flashcard */
+#flashcard-note {
+    resize: vertical;
+    min-height: 40px;
+    font-size: 1rem;
+}
