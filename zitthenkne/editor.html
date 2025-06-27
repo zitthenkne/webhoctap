@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trình chỉnh sửa trắc nghiệm</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-[#FCE4EC] p-6 text-sm">
+    <div class="max-w-4xl mx-auto">
+        <header class="bg-white rounded-t-lg shadow-lg p-4 flex justify-between items-center border-b border-pink-100">
+            <h1 class="text-xl font-bold text-[#FF69B4]">Trình chỉnh sửa trắc nghiệm</h1>
+            <div>
+                <a href="index.html" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-sm">
+                    <i class="fas fa-arrow-left mr-2"></i> Quay lại
+                </a>
+                <button id="save-quiz-btn" class="px-4 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition text-sm ml-2">
+                    <i class="fas fa-save mr-2"></i> Lưu thay đổi
+                </button>
+            </div>
+        </header>
+
+        <main id="editor-container" class="bg-white rounded-b-lg shadow-lg p-6">
+            <div id="loading-state" class="text-center text-gray-500">
+                <i class="fas fa-spinner fa-spin mr-2"></i> Đang tải trình chỉnh sửa...
+            </div>
+            <!-- Nội dung trình chỉnh sửa sẽ được JS chèn vào đây -->
+        </main>
+    </div>
+    <div id="toast-container"></div>
+    <script type="module" src="editor.js"></script>
+</body>
+</html>

@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zitthenkne - Công cụ học tập</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="flex h-screen bg-gray-50 text-gray-700 text-sm">
+    <!-- Mobile Top Bar with Hamburger -->
+    <div class="md:hidden fixed top-0 left-0 w-full z-40 bg-white/95 shadow-lg flex items-center justify-between px-2 py-2 border-b border-pink-100 min-h-[54px]">
+        <div class="flex items-center gap-2 min-w-0">
+            <button id="menu-toggle-btn" class="text-2xl text-pink-500 focus:outline-none p-1 flex-shrink-0">
+                <i class="fas fa-bars"></i>
+            </button>
+            <a href="index.html" class="flex items-center gap-1 min-w-0">
+                <img src="assets/logo.png" alt="Zitthenkne Logo" class="w-9 h-9 rounded-full border-2 border-[#FFB6C1] shadow bg-white ml-1 hover:scale-105 transition-transform duration-200 flex-shrink-0">
+                <span class="font-bold text-[#FF69B4] text-base truncate block">Zitthenkne</span>
+            </a>
+        </div>
+        <img id="user-avatar-mobile" src="https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff" class="w-9 h-9 rounded-full border-2 border-[#D8BFD8] shadow ml-1 flex-shrink-0">
+    </div>
+    <!-- Overlay for sidebar on mobile -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-20 z-30 hidden md:hidden transition-opacity duration-200"></div>
+    <aside id="sidebar" class="w-11/12 max-w-xs bg-white/90 backdrop-blur-xl shadow-2xl fixed md:relative z-40 h-full transition-transform duration-300 ease-in-out rounded-r-3xl border-r-2 border-pink-100 top-0 left-0 md:static md:translate-x-0 -translate-x-full md:rounded-none md:block">
+        <!-- Nút đóng sidebar trên mobile -->
+        <button id="sidebar-close-btn" class="md:hidden absolute top-3 right-3 text-gray-400 hover:text-pink-500 text-2xl z-50 bg-white/80 rounded-full p-1 shadow"><i class="fas fa-times"></i></button>
+        <div class="p-4 flex flex-col items-center justify-center border-b border-pink-200 gap-1">
+            <a href="index.html" class="flex flex-col items-center group">
+                <img src="assets/logo.png" alt="Zitthenkne Logo" class="w-12 h-12 rounded-full shadow-2xl border-2 border-[#FFB6C1] animate__animated animate__pulse animate__infinite group-hover:scale-105 transition-transform duration-200">
+                <h1 class="text-lg font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#FF69B4] to-[#D8BFD8] tracking-wider drop-shadow-lg whitespace-nowrap group-hover:underline mt-1">Zitthenkne</h1>
+            </a>
+            <img id="user-avatar-sidebar" src="https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff" class="w-9 h-9 rounded-full border-2 border-[#D8BFD8] shadow mt-1">
+            <span id="user-name-sidebar" class="text-gray-700 font-semibold text-sm mt-1">Khách</span>
+        </div>
+        <nav class="p-2">
+            <ul class="flex flex-col gap-2">
+                <li><a href="#" data-target="dashboardContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm active:bg-[#FF69B4]/30 text-base gap-3"><i class="fas fa-home text-xl w-7 text-center"></i><span>Trang chủ</span></a></li>
+                <li><a href="#" data-target="createQuizContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-plus-circle text-xl w-7 text-center"></i><span>Tạo trắc nghiệm</span></a></li>
+                <li><a href="#" data-target="libraryContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-book text-xl w-7 text-center"></i><span>Thư viện</span></a></li>
+                <li><a href="#" data-target="publicLibraryContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-globe text-xl w-7 text-center"></i><span>Thư viện công cộng</span></a></li>
+                <li><a href="#" data-target="statsContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-chart-bar text-xl w-7 text-center"></i><span>Thống kê</span></a></li>
+                <li><a href="#" data-target="myStudyRoomsContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-chalkboard-teacher text-xl w-7 text-center"></i><span>Phòng học của tôi</span></a></li>
+            </ul>
+        </nav>
+    </aside>
+    <div class="flex-1 flex flex-col overflow-hidden pt-16 md:pt-0"> 
+        <!-- Top Bar - CẬP NHẬT CHO GIAO DIỆN DI ĐỘNG -->
+        <header class="bg-white shadow-lg sticky top-0 z-30 border-b-2 border-pink-100 hidden md:block">
+            <div class="container mx-auto px-4 py-3 flex justify-between items-center">
+                <div class="flex items-center gap-4">
+                    <!-- Logo & Tên trang web (Chỉ hiển thị trên di động) -->
+                    <!-- Đã chuyển sang sidebar/mobile topbar -->
+                    <!-- Tiêu đề trang (Chỉ hiển thị trên máy tính) -->
+                    <h2 id="pageTitle" class="text-2xl font-bold text-gray-800 hidden md:block tracking-wide">Trang chủ</h2>
+                </div>
+                <!-- Menu người dùng (desktop) -->
+                <div id="user-menu-button" class="relative">
+                    <button class="flex items-center gap-2 hover:bg-pink-50 px-4 py-2 rounded-2xl transition shadow border-2 border-transparent hover:border-[#FFB6C1]">
+                        <span id="user-name" class="text-gray-700 font-semibold text-lg">Khách</span>
+                        <img id="user-avatar" src="https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff" class="w-10 h-10 rounded-full border-4 border-[#D8BFD8] shadow-lg hover:shadow-pink-200 transition-all duration-300">
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-[#FCE4EC] p-2 sm:p-4 md:p-6">
+            <div id="dashboardContent" class="content-panel fade-in">
+                <div class="text-center mt-10 mb-8 md:mt-16 md:mb-10">
+                    <h2 class="text-2xl md:text-3xl font-extrabold text-[#FF69B4] drop-shadow mb-2">Bạn muốn làm gì hôm nay?</h2>
+                </div>
+                <div class="grid grid-cols-1 gap-5 sm:gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-2xl md:max-w-6xl mx-auto px-3 sm:px-6">
+                    <button type="button" id="selectCreateQuiz" class="group bg-white rounded-3xl shadow-xl p-7 sm:p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-[#FFB6C1] flex flex-col items-center gap-2 mb-2 px-2 sm:px-4">
+                        <i class="fas fa-file-alt text-4xl sm:text-5xl text-[#FF69B4] mb-2 transition-transform group-hover:scale-110"></i>
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800">Tạo Trắc Nghiệm</h3>
+                        <p class="text-gray-500 mt-1 text-sm sm:text-base">Biến file Excel/CSV của bạn thành một bài kiểm tra tương tác.</p>
+                    </button>
+                    <a href="#" id="selectStudyRoom" class="group bg-white rounded-3xl shadow-xl p-7 sm:p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-blue-300 flex flex-col items-center gap-2 mb-2 block px-2 sm:px-4">
+                        <i class="fas fa-users text-4xl sm:text-5xl text-blue-400 mb-2 transition-transform group-hover:scale-110"></i>
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800">Đánh đề</h3>
+                        <p class="text-gray-500 mt-1 text-sm sm:text-base">Tạo phòng học nhóm và cùng nhau giải đề trên bảng trắng.</p>
+                    </a>
+                    <button type="button" id="selectGpaCalculator" class="group bg-white rounded-3xl shadow-xl p-7 sm:p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-[#D8BFD8] flex flex-col items-center gap-2 mb-2 lg:col-start-1 md:col-span-2 lg:col-start-3 px-2 sm:px-4">
+                        <i class="fas fa-calculator text-4xl sm:text-5xl text-[#D8BFD8] mb-2 transition-transform group-hover:scale-110"></i>
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800">Tính Điểm Hệ 4</h3>
+                        <p class="text-gray-500 mt-1 text-sm sm:text-base">Quy đổi nhanh điểm số trắc nghiệm của bạn sang thang điểm 4.0.</p>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="createQuizContent" class="content-panel hidden fade-in">
+                <div class="bg-white rounded-lg shadow-lg p-6 mb-8">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center">
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-700">Tạo trắc nghiệm mới</h3>
+                            <p class="text-gray-500">Tải lên file Excel/CSV để bắt đầu</p>
+                        </div>
+                        <button type="button" id="download-template-btn" class="mt-4 md:mt-0 px-4 py-2 bg-white text-[#FF69B4] border border-[#FF69B4] rounded-lg hover:bg-pink-50 transition flex items-center shadow-sm">
+                            <i class="fas fa-download mr-2"></i> Tải file mẫu
+                        </button>
+                    </div>
+                    <div id="upload-area" class="mt-4 border-2 border-dashed border-[#FFB6C1] rounded-lg p-8 text-center cursor-pointer transition duration-300 ease-in-out hover:bg-pink-50">
+                        <input type="file" id="fileInput" class="hidden" accept=".xlsx,.xls,.csv">
+                        <div class="flex flex-col items-center justify-center">
+                            <img src="assets/hero-image.png" alt="Cute squirrel with a book" class="w-32 h-32 mb-4">
+                            <h4 class="text-lg font-medium text-[#FF69B4] mb-2">Thả "hạt dẻ tri thức" của bạn vào đây!</h4>
+                            <p class="text-sm text-gray-500 mb-4">Hỗ trợ file Excel (.xlsx, .xls) hoặc CSV</p>
+                        </div>
+                    </div>
+                    <div id="fileInfo" class="mt-4 hidden text-center">
+                        <div class="inline-flex items-center justify-center bg-pink-50 p-3 rounded-lg">
+                            <i class="fas fa-file-excel text-[#FF69B4] mr-2 text-2xl"></i>
+                            <span id="fileName" class="font-medium text-gray-700"></span>
+                        </div>
+                        <p id="question-count-info" class="text-sm my-2 font-medium text-gray-600"></p>
+                        <div class="flex justify-center flex-wrap gap-4 mt-2">
+                            <button type="button" id="processBtn" class="px-6 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition shadow-md"><i class="fas fa-play-circle mr-2"></i> Bắt đầu làm bài</button>
+                            <button type="button" id="saveBtn-preQuiz" class="px-6 py-2 bg-[#D8BFD8] text-white rounded-lg hover:bg-opacity-80 transition shadow-md"><i class="fas fa-save mr-2"></i> Lưu vào thư viện</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="gpaCalculatorContent" class="content-panel hidden fade-in">
+                <div class="max-w-xl mx-auto bg-white rounded-lg shadow-lg p-8">
+                    <h2 class="text-2xl font-bold text-center text-[#FF69B4] mb-6">Công cụ tính điểm Đại học Y Dược</h2>
+                    <form id="gpa-form">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="correct-answers" class="block text-sm font-medium text-gray-700">Số câu đúng</label>
+                                <input type="number" id="correct-answers" class="mt-1 block w-full px-4 py-2 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4]" placeholder="Ví dụ: 35">
+                            </div>
+                            <div>
+                                <label for="total-questions" class="block text-sm font-medium text-gray-700">Tổng số câu</label>
+                                <input type="number" id="total-questions" class="mt-1 block w-full px-4 py-2 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4]" placeholder="Ví dụ: 50">
+                            </div>
+                        </div>
+                        <div class="mt-6">
+                            <button type="button" id="calculate-gpa-btn" class="w-full px-6 py-3 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition shadow-md font-bold">Quy đổi điểm</button>
+                        </div>
+                    </form>
+                    <div id="gpa-result-area" class="mt-6 text-center hidden p-6 bg-pink-50 rounded-lg">
+                        <img id="gpa-squirrel-img" src="" alt="Biểu cảm của sóc con" class="w-24 h-24 mx-auto mb-4">
+                        <p id="gpa-motivation-text" class="text-gray-600 font-semibold mb-4"></p>
+                        <div class="flex justify-around items-center">
+                            <div>
+                                <p class="text-sm text-gray-500">Điểm hệ 10</p>
+                                <p id="gpa-score10-text" class="text-3xl font-bold text-[#FF69B4]"></p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Điểm hệ 4</p>
+                                <p id="gpa-score4-text" class="text-3xl font-bold text-gray-700"></p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">Điểm chữ</p>
+                                <p id="gpa-letter-grade" class="text-3xl font-bold text-gray-700"></p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="libraryContent" class="content-panel hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-[#FF69B4]">Thư viện hạt dẻ</h2>
+                    <button type="button" id="refresh-library-btn" class="px-4 py-2 text-gray-600 hover:text-pink-500 transition" title="Tải lại"><i class="fas fa-sync-alt"></i></button>
+                </div>
+                <div id="quiz-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    </div>
+            </div>
+            
+            <div id="publicLibraryContent" class="content-panel hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-[#FF69B4]">Thư viện công cộng</h2>
+                    <button type="button" id="refresh-public-library-btn" class="px-4 py-2 text-gray-600 hover:text-pink-500 transition" title="Tải lại"><i class="fas fa-sync-alt"></i></button>
+                </div>
+                <div class="mb-4 p-4 bg-blue-50 rounded-lg text-blue-800">
+                    <p><i class="fas fa-info-circle mr-2"></i> Đây là nơi các bộ đề chất lượng được chia sẻ bởi cộng đồng. Bạn có thể đóng góp bộ đề của mình khi lưu bài kiểm tra.</p>
+                </div>
+                <div id="public-quiz-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                </div>
+            </div>
+
+            <div id="statsContent" class="content-panel hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-[#FF69B4]">Vườn cây thành tích</h2>
+                    <button type="button" id="refresh-stats-btn" class="px-4 py-2 text-gray-600 hover:text-pink-500 transition" title="Tải lại"><i class="fas fa-sync-alt"></i></button>
+                </div>
+                <div class="mb-8">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-700">Thành tựu đã mở khóa</h3>
+                    <div id="achievements-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6 text-center">
+                        </div>
+                </div>
+                <div class="bg-white rounded-lg shadow p-6 mb-6">
+                    <h3 class="text-lg font-semibold mb-4 text-gray-700">Tiến độ qua các lần làm bài</h3>
+                    <canvas id="progressChart"></canvas>
+                </div>
+                <div id="stats-container" class="bg-white rounded-lg shadow">
+                    <h3 class="text-lg font-semibold p-6 text-gray-700">Lịch sử chi tiết</h3>
+                    </div>
+            </div>
+
+            <div id="myStudyRoomsContent" class="content-panel hidden p-6">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6">Phòng học của tôi</h2>
+                <div class="flex justify-end mb-4">
+                    <button id="create-new-study-room-btn" class="px-6 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition">
+                        <i class="fas fa-plus-circle mr-2"></i> Tạo phòng mới
+                    </button>
+                </div>
+                <div id="my-study-rooms-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Các phòng học của bạn sẽ được tải vào đây -->
+                </div>
+            </div>
+        </main>
+        <footer class="bg-white/80 backdrop-blur-lg text-gray-600 text-center p-3 border-t border-pink-100 flex-shrink-0 rounded-t-2xl shadow-inner text-xs md:text-base">
+            <p>&copy; 2025 Zitthenk - Y23C - UMP.</p>
+        </footer>
+        <div id="squirrel-floating" class="fixed bottom-4 right-4 z-50 cursor-pointer select-none max-w-[60vw] sm:max-w-xs">
+            <img src="assets/squirrel-pixel.png" alt="Pixel Squirrel Mascot" class="w-16 h-16 rounded-2xl shadow-xl hover:scale-110 transition-transform duration-300 bg-white/80 backdrop-blur-md border-2 border-pink-200">
+            <div id="squirrel-message" class="hidden absolute bottom-16 right-0 bg-white/90 text-gray-800 rounded-lg shadow-lg px-4 py-2 text-base max-w-[80vw] sm:max-w-xs z-50 border border-pink-200"></div>
+        </div>
+    </div>
+
+    <div id="authModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden px-2">
+        <div class="bg-white rounded-2xl shadow-2xl p-4 sm:p-8 w-full max-w-md relative">
+            <button type="button" id="closeModalBtn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700"><i class="fas fa-times text-2xl"></i></button>
+            <form id="auth-form">
+                <h2 class="text-2xl font-bold text-center mb-6 text-[#FF69B4]">Chào mừng bạn!</h2>
+                <div class="space-y-4">
+                    <input type="email" id="emailInput" placeholder="Email" class="w-full px-4 py-2 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4]">
+                    <input type="password" id="passwordInput" placeholder="Mật khẩu" class="w-full px-4 py-2 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4]" type="password">
+                </div>
+                <div class="mt-6 flex flex-col md:flex-row gap-4">
+                    <button type="button" id="loginBtn" class="w-full px-6 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition">Đăng nhập</button>
+                    <button type="button" id="signupBtn" class="w-full px-6 py-2 bg-[#D8BFD8] text-white rounded-lg hover:bg-opacity-80 transition">Đăng ký</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <div id="joinRoomModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden px-2">
+        <div class="bg-white rounded-2xl shadow-2xl p-4 sm:p-8 w-full max-w-md relative">
+            <button type="button" id="closeJoinRoomModalBtn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700"><i class="fas fa-times text-2xl"></i></button>
+            <h2 class="text-2xl font-bold text-center mb-6 text-[#FF69B4]">Vào phòng học</h2>
+            <input type="text" id="joinRoomIdInput" placeholder="Nhập mã phòng (Room ID)" class="w-full px-4 py-2 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] mb-4 transition-all duration-200">
+            <button type="button" id="joinRoomBtn" class="w-full px-6 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition">Vào phòng</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script type="module" src="app.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const selectStudyRoom = document.getElementById('selectStudyRoom');
+    const joinRoomModal = document.getElementById('joinRoomModal');
+    const closeJoinRoomModalBtn = document.getElementById('closeJoinRoomModalBtn');
+    const joinRoomBtn = document.getElementById('joinRoomBtn');
+    const joinRoomIdInput = document.getElementById('joinRoomIdInput');
+    const myStudyRoomsList = document.getElementById('my-study-rooms-list');
+
+    const joinRoomById = (id) => {
+        const roomId = id ? id.trim() : '';
+        if (roomId) {
+            window.location.href = `study-room.html?id=${encodeURIComponent(roomId)}`;
+        } else if (joinRoomIdInput) {
+            joinRoomIdInput.classList.add('border-red-400');
+            joinRoomIdInput.focus();
+        }
+    };
+
+    if (selectStudyRoom) {
+        selectStudyRoom.addEventListener('click', (e) => {
+            e.preventDefault();
+            joinRoomModal.classList.remove('hidden');
+            joinRoomIdInput.value = '';
+            joinRoomIdInput.classList.remove('border-red-400');
+            joinRoomIdInput.focus();
+        });
+    }
+    if (closeJoinRoomModalBtn) closeJoinRoomModalBtn.addEventListener('click', () => joinRoomModal.classList.add('hidden'));
+    if (joinRoomBtn) joinRoomBtn.addEventListener('click', () => joinRoomById(joinRoomIdInput.value));
+    if (joinRoomIdInput) joinRoomIdInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') joinRoomById(joinRoomIdInput.value);
+    });
+
+    // Hamburger menu logic for mobile
+    const menuToggleBtn = document.getElementById('menu-toggle-btn');
+    const sidebar = document.getElementById('sidebar');
+    const sidebarOverlay = document.getElementById('sidebar-overlay');
+    const sidebarCloseBtn = document.getElementById('sidebar-close-btn');
+    if (menuToggleBtn && sidebar && sidebarOverlay && sidebarCloseBtn) {
+        menuToggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            sidebar.classList.remove('-translate-x-full');
+            sidebarOverlay.classList.remove('hidden');
+        });
+        function closeSidebarImmediately() {
+            sidebar.classList.add('-translate-x-full');
+            // Ẩn overlay ngay lập tức khi sidebar đóng
+            sidebarOverlay.classList.add('hidden');
+        }
+        sidebarCloseBtn.addEventListener('click', closeSidebarImmediately);
+        sidebarOverlay.addEventListener('click', closeSidebarImmediately);
+        // Đóng sidebar khi click vào bất kỳ link hoặc button trong sidebar (trừ nút đóng)
+        const sidebarNav = sidebar.querySelector('nav');
+        if (sidebarNav) {
+            sidebarNav.querySelectorAll('a, button').forEach(el => {
+                el.addEventListener('click', () => {
+                    closeSidebarImmediately();
+                });
+            });
+        }
+    }
+    // Đồng bộ avatar, tên người dùng cho sidebar/mobile
+    const userName = document.getElementById('user-name');
+    const userAvatar = document.getElementById('user-avatar');
+    const userNameSidebar = document.getElementById('user-name-sidebar');
+    const userAvatarSidebar = document.getElementById('user-avatar-sidebar');
+    const userAvatarMobile = document.getElementById('user-avatar-mobile');
+    function syncUserInfo() {
+        if (userName && userNameSidebar) userNameSidebar.textContent = userName.textContent;
+        if (userAvatar && userAvatarSidebar) userAvatarSidebar.src = userAvatar.src;
+        if (userAvatar && userAvatarMobile) userAvatarMobile.src = userAvatar.src;
+    }
+    setTimeout(syncUserInfo, 500); // Sync sau khi user info được load
+
+    // Ẩn/hiện sidebar và overlay đúng trạng thái khi resize hoặc reload
+    function updateSidebarState() {
+        if (window.innerWidth >= 768) {
+            if (sidebar) sidebar.classList.remove('-translate-x-full');
+            if (sidebarOverlay) sidebarOverlay.classList.add('hidden');
+        } else {
+            if (sidebar) sidebar.classList.add('-translate-x-full');
+            if (sidebarOverlay) sidebarOverlay.classList.add('hidden');
+        }
+    }
+    window.addEventListener('resize', updateSidebarState);
+    // Đảm bảo đúng trạng thái khi load trang
+    updateSidebarState();
+});
+</script>
+<script>
+// Squirrel mascot floating message logic
+const squirrelFloating = document.getElementById('squirrel-floating');
+const squirrelMessage = document.getElementById('squirrel-message');
+if (!squirrelMessage) {
+    // Tạo message box nếu chưa có
+    const msgDiv = document.createElement('div');
+    msgDiv.id = 'squirrel-message';
+    msgDiv.className = 'hidden absolute bottom-16 right-0 bg-white/90 text-gray-800 rounded-lg shadow-lg px-4 py-2 text-base max-w-[80vw] sm:max-w-xs z-50 border border-pink-200';
+    squirrelFloating && squirrelFloating.appendChild(msgDiv);
+}
+const squirrelMessages = [
+    'Chúc bạn học tốt! 💪',
+    'Cố lên nhé, bạn làm được mà! 🐿️',
+    'Học vui như sóc nhảy cành!',
+    '<i class="fas fa-heart text-pink-400"></i>',
+    '<i class="fas fa-book text-blue-400"></i>',
+    '<i class="fas fa-graduation-cap text-purple-400"></i>',
+    'Đừng quên uống nước nhé! 💧',
+    'Bạn là số 1! ⭐',
+    'Kiến thức là hạt dẻ, hãy tích lũy mỗi ngày!',
+    '<i class="fas fa-lightbulb text-yellow-400"></i>',
+    'Học tập chăm chỉ, thành công sẽ đến!',
+    'Tự tin lên nào! ✨',
+    'Hôm nay bạn đã cố gắng rất nhiều rồi!'
+];
+if (squirrelFloating) {
+    const msgBox = document.getElementById('squirrel-message');
+    squirrelFloating.addEventListener('click', () => {
+        const msg = squirrelMessages[Math.floor(Math.random() * squirrelMessages.length)];
+        if (msgBox) {
+            msgBox.innerHTML = msg;
+            msgBox.classList.remove('hidden');
+            setTimeout(() => {
+                msgBox.classList.add('hidden');
+            }, 2200);
+        }
+    });
+}
+</script>
+
+</body>
+</html>
