@@ -12,19 +12,17 @@
     <!-- Header -->
     <header class="bg-white shadow-sm p-2 flex justify-between items-center flex-shrink-0 z-20">
         <div class="flex items-center gap-4">
-            <a href="index.html" class="px-4 py-2 text-gray-600 hover:text-pink-500 transition rounded-lg hover:bg-gray-100">
-                <i class="fas fa-arrow-left mr-2"></i>Quay lại
+            <a href="index.html" class="px-4 py-2 text-gray-600 hover:text-pink-500 transition rounded-lg hover:bg-gray-100 flex items-center gap-2">
+                <i class="fas fa-arrow-left"></i> Trang chủ
             </a>
-            <div class="text-sm text-gray-500">
-                ID Phòng: <span id="room-id-display" class="font-mono font-bold text-gray-700">...</span>
-            </div>
+            <div id="room-id-display" class="text-xs text-gray-500 bg-pink-50 px-3 py-1 rounded-lg font-mono"></div>
         </div>
         <div class="flex items-center gap-4">
             <button id="start-collaborative-quiz-btn" class="px-4 py-2 bg-[#D8BFD8] text-white rounded-lg hover:bg-opacity-80 transition text-sm flex items-center gap-2 shadow-sm hover:shadow-md">
-                <i class="fas fa-users mr-1"></i> Cùng nhau đánh đề
+                <i class="fas fa-users"></i> Cùng nhau đánh đề
             </button>
             <button id="share-room-btn" class="px-4 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition text-sm flex items-center gap-2 shadow-sm hover:shadow-md">
-                <i class="fas fa-share-alt"></i> Chia sẻ
+                <i class="fas fa-share-alt"></i> Chia sẻ phòng
             </button>
         </div>
     </header>
@@ -33,55 +31,50 @@
     <main class="flex-1 flex relative">
         <!-- Toolbar -->
         <div class="absolute top-4 left-4 bg-white/80 backdrop-blur-md rounded-lg shadow-lg p-2 flex flex-col gap-2 z-10">
-            <button data-tool="select" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition active"><i class="fas fa-mouse-pointer"></i></button>
-            <button data-tool="pen" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition"><i class="fas fa-pen"></i></button>
+            <button data-tool="select" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition active" title="Chọn"><i class="fas fa-mouse-pointer"></i></button>
+            <button data-tool="pen" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Bút"><i class="fas fa-pen"></i></button>
             <button data-tool="highlight" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-yellow-100 transition" title="Highlight"><i class="fas fa-highlighter"></i></button>
-            <button data-tool="line" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition"><i class="fas fa-minus"></i></button>
-            <button data-tool="rectangle" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Rectangle"><i class="far fa-square"></i></button>
-            <button data-tool="circle" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Circle"><i class="far fa-circle"></i></button>
-            <button data-tool="eraser" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition"><i class="fas fa-eraser"></i></button>
-            <input type="color" id="color-picker" value="#FF69B4" class="w-10 h-10 p-1 border-none rounded cursor-pointer bg-white">
-            <input type="range" id="line-width" min="1" max="50" value="5" class="w-20 mx-auto my-2">
+            <button data-tool="line" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Đường thẳng"><i class="fas fa-minus"></i></button>
+            <button data-tool="rectangle" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Hình chữ nhật"><i class="far fa-square"></i></button>
+            <button data-tool="circle" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Hình tròn"><i class="far fa-circle"></i></button>
+            <button data-tool="eraser" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Tẩy"><i class="fas fa-eraser"></i></button>
+            <input type="color" id="color-picker" value="#FF69B4" class="w-10 h-10 p-1 border-none rounded cursor-pointer bg-white" title="Chọn màu">
+            <input type="range" id="line-width" min="1" max="50" value="5" class="w-20 mx-auto my-2" title="Độ dày nét">
             <label class="flex items-center gap-2 px-2 cursor-pointer select-none text-xs"><input type="checkbox" id="dashed-checkbox" class="accent-pink-400"> Nét đứt</label>
-            <label class="flex items-center gap-2 px-2 cursor-pointer select-none text-xs"><input type="checkbox" id="fill-checkbox" class="accent-pink-400"> Tô màu</label>
-            <button id="upload-image-object-btn" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Tải ảnh lên bảng"><i class="fas fa-image"></i></button>
-            <input type="file" id="image-object-file-input" class="hidden" accept="image/*">
-            <button id="undo-btn" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition opacity-50" disabled><i class="fas fa-undo"></i></button>
-            <button id="redo-btn" class="tool-btn p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition opacity-50" disabled><i class="fas fa-redo"></i></button>
-            <button id="clear-canvas-btn" class="tool-btn text-red-500 p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-red-100 transition"><i class="fas fa-trash"></i></button>
+            <button id="undo-btn" class="p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Hoàn tác"><i class="fas fa-undo"></i></button>
+            <button id="redo-btn" class="p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Làm lại"><i class="fas fa-redo"></i></button>
+            <button id="clear-canvas-btn" class="p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-red-100 transition text-red-500" title="Xóa bảng"><i class="fas fa-trash"></i></button>
+            <button id="upload-image-object-btn" class="p-2 w-10 h-10 flex items-center justify-center rounded hover:bg-gray-200 transition" title="Chèn ảnh"><i class="fas fa-image"></i></button>
+            <input type="file" id="image-object-file-input" accept="image/*" class="hidden">
         </div>
 
         <!-- Canvas Container -->
-        <div id="canvas-container" class="flex-1 relative w-full h-full bg-white">
-            <canvas id="whiteboard" class="absolute top-0 left-0"></canvas>
+        <div id="canvas-container" class="flex-1 relative w-full h-full bg-white rounded-lg shadow-inner flex items-center justify-center">
+            <canvas id="whiteboard" class="w-full h-full rounded-lg cursor-crosshair"></canvas>
         </div>
 
-        <!-- --- PHÒNG HỌC: KHU VỰC CHAT & THÀNH VIÊN --- -->
+        <!-- Chat & Member Sidebar -->
         <aside class="absolute top-4 right-4 w-80 max-w-full bg-white/90 rounded-lg shadow-lg flex flex-col z-20 h-[90%]">
-            <!-- Danh sách thành viên online -->
-            <div class="p-4 border-b border-pink-100 flex items-center justify-between">
-                <div class="font-bold text-[#FF69B4] flex items-center gap-2"><i class="fas fa-users"></i> Thành viên</div>
-                <button id="invite-member-btn" class="text-xs px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition flex items-center gap-1"><i class="fas fa-user-plus"></i> Mời</button>
+            <div class="flex flex-col h-full">
+                <div class="flex items-center justify-between p-4 border-b border-pink-100">
+                    <div class="font-bold text-[#FF69B4] flex items-center gap-2"><i class="fas fa-users"></i> Thành viên</div>
+                    <span id="room-notice-area" class="text-xs text-gray-400"></span>
+                </div>
+                <ul id="member-list" class="flex-1 overflow-y-auto p-4 space-y-2 bg-pink-50 rounded-b-lg"></ul>
+                <div class="border-t border-pink-100 p-4 bg-white">
+                    <form id="chat-form" class="flex gap-2">
+                        <input id="chat-input" type="text" placeholder="Nhắn tin..." class="flex-1 p-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 focus:ring-pink-200">
+                        <button type="submit" class="bg-[#FF69B4] text-white px-4 py-2 rounded-lg hover:bg-opacity-80 transition flex items-center gap-1"><i class="fas fa-paper-plane"></i></button>
+                    </form>
+                    <div id="chat-messages" class="mt-4 h-40 overflow-y-auto space-y-2"></div>
+                </div>
             </div>
-            <ul id="member-list" class="flex-1 overflow-y-auto p-2 space-y-2 text-sm"></ul>
-            <!-- Thông báo vào/ra phòng -->
-            <div id="room-notice-area" class="px-4 py-2 text-xs text-gray-500"></div>
-            <!-- Chat realtime -->
-            <div class="flex-1 flex flex-col border-t border-pink-100">
-                <div id="chat-messages" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
-                <form id="chat-form" class="flex items-center gap-2 p-2 border-t border-pink-100">
-                    <input id="chat-input" type="text" placeholder="Nhập tin nhắn..." class="flex-1 px-3 py-2 rounded border border-gray-200 focus:outline-none focus:ring-2 focus:ring-[#FF69B4]" autocomplete="off">
-                    <button type="submit" class="px-3 py-2 bg-[#FF69B4] text-white rounded hover:bg-opacity-80 transition"><i class="fas fa-paper-plane"></i></button>
-                </form>
-            </div>
-            <!-- Chia sẻ tiến độ/kết quả quiz -->
-            <div id="quiz-progress-share-area" class="p-2 border-t border-pink-100 text-xs text-gray-600"></div>
         </aside>
         <!-- Loading Overlay -->
-        <div id="loading-overlay" class="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
-            <div class="text-center">
-                <i class="fas fa-spinner fa-spin text-4xl text-[#FF69B4] mb-4"></i>
-                <p class="text-lg text-gray-600">Đang tải phòng học...</p>
+        <div id="loading-overlay" class="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50 hidden">
+            <div class="flex flex-col items-center gap-4">
+                <i class="fas fa-spinner fa-spin text-4xl text-[#FF69B4]"></i>
+                <span class="text-[#FF69B4] font-semibold">Đang tải dữ liệu...</span>
             </div>
         </div>
     </main>
@@ -89,46 +82,31 @@
     <!-- Collaborative Quiz Modal -->
     <div id="collaborative-quiz-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40 hidden">
         <div class="bg-white rounded-lg shadow-xl p-8 w-full max-w-3xl relative">
-            <button type="button" id="close-collaborative-quiz-modal-btn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700"><i class="fas fa-times text-2xl"></i></button>
-            <h2 class="text-2xl font-bold text-center mb-6 text-[#FF69B4]">Cùng nhau đánh đề</h2>
-
-            <div id="quiz-upload-area" class="mb-6">
-                <p class="text-gray-600 mb-4 text-center">Tải lên file câu hỏi để bắt đầu phiên trắc nghiệm.</p>
-                <div id="upload-quiz-file-area" class="border-2 border-dashed border-[#FFB6C1] rounded-lg p-8 text-center cursor-pointer transition duration-300 ease-in-out hover:bg-pink-50">
-                    <input type="file" id="quizFileInput" class="hidden" accept=".xlsx,.xls,.csv">
-                    <div class="flex flex-col items-center justify-center">
-                        <i class="fas fa-file-upload text-5xl text-[#FF69B4] mb-4"></i>
-                        <h4 class="text-lg font-medium text-[#FF69B4] mb-2">Kéo thả file Excel/CSV vào đây hoặc click để chọn</h4>
-                        <p class="text-sm text-gray-500">Hỗ trợ file Excel (.xlsx, .xls) hoặc CSV</p>
-                    </div>
-                </div>
-                <div id="quizFileInfo" class="mt-4 hidden text-center">
-                    <div class="inline-flex items-center justify-center bg-pink-50 p-3 rounded-lg">
-                        <i class="fas fa-file-excel text-[#FF69B4] mr-2 text-2xl"></i>
-                        <span id="quizFileName" class="font-medium text-gray-700"></span>
-                    </div>
-                    <p id="quiz-question-count-info" class="text-sm my-2 font-medium text-gray-600"></p>
-                    <button type="button" id="start-quiz-collaboration-btn" class="mt-4 px-6 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition shadow-md"><i class="fas fa-play-circle mr-2"></i> Bắt đầu làm bài</button>
-                </div>
+            <button id="close-collaborative-quiz-modal-btn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700"><i class="fas fa-times text-2xl"></i></button>
+            <div id="quiz-upload-area" class="border-2 border-dashed border-pink-300 rounded-lg p-8 text-center cursor-pointer hover:bg-pink-50 transition mb-6">
+                <i class="fas fa-upload text-3xl text-[#FF69B4] mb-2"></i>
+                <div class="font-semibold text-[#FF69B4]">Kéo thả hoặc chọn file Excel đề trắc nghiệm</div>
+                <input type="file" id="quizFileInput" accept=".xlsx,.xls" class="hidden">
+                <div id="quizFileInfo" class="hidden mt-2 text-xs text-gray-500">File: <span id="quizFileName"></span> <span id="quiz-question-count-info"></span></div>
             </div>
-
+            <div class="flex justify-end mb-4">
+                <button id="start-quiz-collaboration-btn" class="bg-[#FF69B4] text-white px-6 py-2 rounded-lg hover:bg-opacity-80 transition flex items-center gap-2 shadow disabled:opacity-50" disabled><i class="fas fa-play"></i> Bắt đầu</button>
+            </div>
             <div id="collaborative-quiz-display" class="hidden">
-                <div class="collaborative-quiz-progress-bar mb-4">
-                    <div id="collaborative-quiz-progress-fill" class="h-full bg-[#FF69B4] rounded-full transition-all duration-300" style="width: 0%;"></div>
-                </div>
-                <div id="quiz-question-area" class="bg-gray-50 p-6 rounded-lg shadow-inner mb-4">
-                    <p class="text-lg font-semibold text-gray-800 mb-4" id="current-question-text"></p>
-                    <div id="quiz-options-area" class="space-y-3">
-                        <!-- Options will be rendered here -->
+                <div class="mb-4">
+                    <div class="collaborative-quiz-progress-bar mb-2">
+                        <div id="collaborative-quiz-progress-fill" class="h-full bg-[#FF69B4] rounded-full transition-all duration-300" style="width: 0%;"></div>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span id="current-question-text" class="font-semibold"></span>
+                        <span id="question-counter" class="text-xs text-gray-500"></span>
                     </div>
                 </div>
-                <div class="flex justify-between items-center mt-6">
-                    <button id="prev-question-btn" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"><i class="fas fa-arrow-left mr-2"></i> Câu trước</button>
-                    <span id="question-counter" class="font-medium text-gray-600">1 / 10</span>
-                    <button id="next-question-btn" class="px-4 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition">Câu tiếp theo <i class="fas fa-arrow-right ml-2"></i></button>
-                </div>
-                <div class="text-center mt-6">
-                    <button id="finish-quiz-collaboration-btn" class="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition shadow-md hidden"><i class="fas fa-check-circle mr-2"></i> Hoàn thành & Lưu</button>
+                <div id="quiz-options-area" class="grid grid-cols-1 gap-3 mb-4"></div>
+                <div class="flex justify-between items-center gap-2">
+                    <button id="prev-question-btn" class="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition flex items-center gap-2" disabled><i class="fas fa-arrow-left"></i> Trước</button>
+                    <button id="next-question-btn" class="px-4 py-2 bg-gray-200 text-gray-600 rounded-lg hover:bg-gray-300 transition flex items-center gap-2" disabled>Tiếp <i class="fas fa-arrow-right"></i></button>
+                    <button id="finish-quiz-collaboration-btn" class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition flex items-center gap-2 hidden"><i class="fas fa-check"></i> Hoàn thành & Lưu</button>
                 </div>
             </div>
         </div>
