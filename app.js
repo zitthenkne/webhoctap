@@ -31,7 +31,6 @@ const selectStudyRoomBtn = document.getElementById('selectStudyRoom');
 const calculateGpaBtn = document.getElementById('calculate-gpa-btn');
 const gpaResultArea = document.getElementById('gpa-result-area');
 const downloadTemplateBtn = document.getElementById('download-template-btn');
-const publicQuizListContainer = document.getElementById('public-quiz-list-container');
 
 let questions = [];
 let userQuizSets = []; // Biến cache để tìm kiếm phía client
@@ -65,9 +64,6 @@ function showContent(targetId, title = 'Dashboard') {
     if (targetId === 'myStudyRoomsContent') {
         loadAndDisplayMyStudyRooms();
     }
-    if (targetId === 'publicLibraryContent') {
-        loadAndDisplayPublicLibrary();
-    }
 }
 
 onAuthStateChanged(auth, user => { if (user) { userName.textContent = user.email.split('@')[0]; userAvatar.src = `https://ui-avatars.com/api/?name=${user.email[0]}&background=FF69B4&color=fff`; userMenuButton.onclick = handleLogout; } else { userName.textContent = 'Khách'; userAvatar.src = `https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff`; userMenuButton.onclick = toggleAuthModal; } });
@@ -76,7 +72,45 @@ function toggleAuthModal() { authModal.classList.toggle('hidden'); }
 async function handleLogin() { const email = document.getElementById('emailInput').value; const password = document.getElementById('passwordInput').value; if (!email || !password) return showToast('Vui lòng nhập đủ thông tin.', 'warning'); try { await signInWithEmailAndPassword(auth, email, password); toggleAuthModal(); showToast('Đăng nhập thành công!', 'success'); } catch (error) { showToast('Đăng nhập thất bại: ' + error.message, 'error'); } }
 async function handleSignup() { const email = document.getElementById('emailInput').value; const password = document.getElementById('passwordInput').value; if (!email || !password) return showToast('Vui lòng nhập đủ thông tin.', 'warning'); try { const userCredential = await createUserWithEmailAndPassword(auth, email, password); const user = userCredential.user; await setDoc(doc(db, "users", user.uid), { email: user.email, createdAt: new Date(), quizSetsCreated: 0 }); showToast('Đăng ký thành công!', 'success'); toggleAuthModal(); } catch (error) { showToast('Đăng ký thất bại: ' + error.message, 'error'); } }
 async function handleFileSelect(e) { const file = e.target.files[0]; if (!file) return; fileNameElem.textContent = file.name; questionCountInfo.textContent = 'Đang phân tích...'; fileInfo.classList.remove('hidden'); processBtn.classList.add('hidden'); saveBtnPreQuiz.classList.add('hidden'); try { const parsedQuestions = await parseFile(file); if (parsedQuestions.length === 0) { questionCountInfo.textContent = 'Lỗi: Không tìm thấy câu hỏi.'; return; } const topics = parsedQuestions.map(q => q.topic); const uniqueTopics = new Set(topics); questions = parsedQuestions; currentQuizTitle = file.name.replace(/\.(xlsx|xls|csv)$/, ''); questionCountInfo.textContent = `✓ Tìm thấy ${questions.length} câu hỏi / ${uniqueTopics.size} chủ đề.`; processBtn.classList.remove('hidden'); saveBtnPreQuiz.classList.remove('hidden'); saveBtnPreQuiz.disabled = false; saveBtnPreQuiz.innerHTML = '<i class="fas fa-save mr-2"></i> Lưu vào thư viện'; } catch (error) { questionCountInfo.textContent = 'Lỗi! Không thể đọc file.'; console.error("Lỗi phân tích file:", error); } }
-function parseFile(file) { return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = function(e) { try { const data = new Uint8Array(e.target.result); const workbook = XLSX.read(data, { type: 'array' }); const firstSheet = workbook.Sheets[workbook.SheetNames[0]]; const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 }); const parsedQuestions = jsonData.slice(1).map(row => { if (!row || !row[0] || String(row[0]).trim() === '') return null; return { question: row[0], answers: [row[1], row[2], row[3], row[4]].filter(ans => ans != null), correctAnswerIndex: parseInt(row[5], 10) - 1, explanation: row[7] || 'Không có giải thích.', topic: row[6] || 'Chung' }; }).filter(q => q !== null); resolve(parsedQuestions); } catch (error) { reject(error); } }; reader.onerror = reject; reader.readAsArrayBuffer(file); }); }
+function parseFile(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                const parsedQuestions = jsonData.slice(1).map(row => {
+                    // Bỏ qua các hàng trống
+                    if (!row || !row[0] || String(row[0]).trim() === '') return null;
+                    
+                    // Lấy giá trị đáp án đúng (1, 2, 3, 4) từ file Excel
+                    const correctAnswerValue = parseInt(row[5], 10);
+
+                    return {
+                        question: row[0],
+                        // SỬA ĐỔI 1: Đổi tên thuộc tính 'answers' thành 'options'
+                        options: [row[1], row[2], row[3], row[4]].filter(ans => ans != null && String(ans).trim() !== ''),
+                        
+                        // SỬA ĐỔI 2: Lưu trữ đáp án đúng dưới dạng giá trị (1,2,3,4) thay vì index
+                        answer: (!isNaN(correctAnswerValue) && correctAnswerValue >= 1 && correctAnswerValue <= 4) ? correctAnswerValue : null,
+                        
+                        // SỬA ĐỔI 3: Đổi tên thuộc tính 'explanation' thành 'explain' và dùng chuỗi rỗng làm mặc định
+                        explain: row[7] || '', 
+                        
+                        topic: row[6] || 'Chung' // Giữ lại thuộc tính topic để hiển thị thông tin
+                    };
+                }).filter(q => q !== null); // Lọc bỏ các câu hỏi rỗng
+                resolve(parsedQuestions);
+            } catch (error) {
+                reject(error);
+            }
+        };
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+    });
+}
 let currentQuizTitle = ''; // Biến này cần được khai báo ở đây
 
 // Hàm lưu và bắt đầu bài kiểm tra (quay lại như cũ)
@@ -97,7 +131,8 @@ async function saveAndStartQuiz() {
             title: currentQuizTitle,
             questionCount: questions.length,
             questions: questions,
-            createdAt: new Date()
+            createdAt: new Date(),
+            isPublic: true // Luôn public bộ đề
         });
         await checkCreationAchievements(user.uid);
         window.location.href = `quiz.html?id=${docRef.id}`;
@@ -127,7 +162,8 @@ async function saveOnly() {
             title: currentQuizTitle,
             questionCount: questions.length,
             questions: questions,
-            createdAt: new Date()
+            createdAt: new Date(),
+            isPublic: true // Luôn public bộ đề
         });
         await checkCreationAchievements(user.uid);
         showToast(`Đã lưu "${currentQuizTitle}" vào thư viện!`, 'success');
@@ -163,41 +199,41 @@ async function checkCreationAchievements(userId) {
 }
 
 // HÀM MỚI: Tải và hiển thị thư viện công cộng
-async function loadAndDisplayPublicLibrary() {
-    publicQuizListContainer.innerHTML = `<div class="text-gray-500">Đang tải các bộ đề công cộng...</div>`;
-    try {
-        // Truy vấn các bộ đề có isPublic là true
-        const q = query(collection(db, "quiz_sets"), where("isPublic", "==", true), orderBy("createdAt", "desc"), limit(20)); // Giới hạn 20 bộ đề gần nhất
-        const querySnapshot = await getDocs(q);
+// async function loadAndDisplayPublicLibrary() {
+//     publicQuizListContainer.innerHTML = `<div class="text-gray-500">Đang tải các bộ đề công cộng...</div>`;
+//     try {
+//         // Truy vấn các bộ đề có isPublic là true
+//         const q = query(collection(db, "quiz_sets"), where("isPublic", "==", true), orderBy("createdAt", "desc"), limit(20)); // Giới hạn 20 bộ đề gần nhất
+//         const querySnapshot = await getDocs(q);
 
-        if (querySnapshot.empty) {
-            publicQuizListContainer.innerHTML = '<p class="text-gray-500">Chưa có bộ đề công cộng nào được chia sẻ.</p>';
-            return;
-        }
+//         if (querySnapshot.empty) {
+//             publicQuizListContainer.innerHTML = '<p class="text-gray-500">Chưa có bộ đề công cộng nào được chia sẻ.</p>';
+//             return;
+//         }
 
-        publicQuizListContainer.innerHTML = '';
-        querySnapshot.forEach((doc) => {
-            const quizSet = doc.data();
-            const card = document.createElement('div');
-            card.className = 'bg-white rounded-lg shadow-md p-4 flex flex-col';
-            card.innerHTML = `
-                <div class="flex-grow">
-                    <h3 class="text-md font-bold text-gray-700">${quizSet.title}</h3>
-                    <p class="text-sm text-gray-500 mt-2">${quizSet.questionCount} câu hỏi</p>
-                    <p class="text-xs text-gray-400 mt-1">Chia sẻ bởi: ${quizSet.userId}</p>
-                    <p class="text-xs text-gray-400 mt-1">Ngày: ${new Date(quizSet.createdAt.toDate()).toLocaleDateString()}</p>
-                </div>
-                <div class="mt-4 flex flex-col gap-2">
-                    <a href="quiz.html?id=${doc.id}" class="w-full text-center px-4 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition text-sm">Bắt đầu</a>
-                </div>
-            `;
-            publicQuizListContainer.appendChild(card);
-        });
-    } catch (e) {
-        console.error("Lỗi tải thư viện công cộng: ", e);
-        publicQuizListContainer.innerHTML = '<p class="text-red-500">Lỗi tải thư viện công cộng.</p>';
-    }
-}
+//         publicQuizListContainer.innerHTML = '';
+//         querySnapshot.forEach((doc) => {
+//             const quizSet = doc.data();
+//             const card = document.createElement('div');
+//             card.className = 'bg-white rounded-lg shadow-md p-4 flex flex-col';
+//             card.innerHTML = `
+//                 <div class="flex-grow">
+//                     <h3 class="text-md font-bold text-gray-700">${quizSet.title}</h3>
+//                     <p class="text-sm text-gray-500 mt-2">${quizSet.questionCount} câu hỏi</p>
+//                     <p class="text-xs text-gray-400 mt-1">Chia sẻ bởi: ${quizSet.userId}</p>
+//                     <p class="text-xs text-gray-400 mt-1">Ngày: ${new Date(quizSet.createdAt.toDate()).toLocaleDateString()}</p>
+//                 </div>
+//                 <div class="mt-4 flex flex-col gap-2">
+//                     <a href="quiz.html?id=${doc.id}" class="w-full text-center px-4 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition text-sm">Bắt đầu</a>
+//                 </div>
+//             `;
+//             publicQuizListContainer.appendChild(card);
+//         });
+//     } catch (e) {
+//         console.error("Lỗi tải thư viện công cộng: ", e);
+//         publicQuizListContainer.innerHTML = '<p class="text-red-500">Lỗi tải thư viện công cộng.</p>';
+//     }
+// }
 
 async function loadAndDisplayLibrary() {
     const user = auth.currentUser;
@@ -531,7 +567,6 @@ async function loadAndDisplayMyStudyRooms() {
             `;
             myStudyRoomsListContainer.appendChild(card);
         });
-
     } catch (e) {
         console.error("Lỗi tải phòng học của người dùng: ", e);
         myStudyRoomsListContainer.innerHTML = '<p class="text-red-500 text-center">Lỗi tải phòng học của bạn.</p>';
@@ -598,25 +633,60 @@ function setupEventListeners() {
     document.body.addEventListener('click', (event) => {
         // Button to create a new study room from the "My Rooms" panel
         if (event.target.id === 'create-new-study-room-btn') {
-            // Tạo phòng mới trên Firestore, rồi chuyển hướng sang study-room.html?id=...
-            (async () => {
+            // Hiện modal nhập ID phòng mới
+            let modal = document.getElementById('createRoomIdModal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'createRoomIdModal';
+                modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-2';
+                modal.innerHTML = `
+                    <div class="bg-white rounded-2xl shadow-2xl p-4 sm:p-8 w-full max-w-md relative">
+                        <button type="button" id="closeCreateRoomIdModalBtn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700"><i class="fas fa-times text-2xl"></i></button>
+                        <h2 class="text-2xl font-bold text-center mb-6 text-[#FF69B4]">Tạo phòng học mới</h2>
+                        <input type="text" id="createRoomIdInput" placeholder="Nhập mã phòng (chỉ chữ/số, không dấu cách)" class="w-full px-4 py-2 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] mb-4 transition-all duration-200">
+                        <button type="button" id="saveCreateRoomIdBtn" class="w-full px-6 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition">Tạo phòng</button>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+            modal.classList.remove('hidden');
+            document.getElementById('createRoomIdInput').value = '';
+            document.getElementById('createRoomIdInput').focus();
+            document.getElementById('closeCreateRoomIdModalBtn').onclick = () => modal.classList.add('hidden');
+            document.getElementById('saveCreateRoomIdBtn').onclick = async () => {
                 const user = auth.currentUser;
+                const newId = document.getElementById('createRoomIdInput').value.trim();
                 if (!user) {
                     showToast('Vui lòng đăng nhập để tạo phòng!', 'warning');
                     toggleAuthModal();
                     return;
                 }
+                if (!newId || !/^[a-zA-Z0-9_-]+$/.test(newId)) {
+                    document.getElementById('createRoomIdInput').classList.add('border-red-400');
+                    return;
+                }
+                // Kiểm tra trùng ID
+                const checkDoc = await getDoc(doc(db, 'study_rooms', newId));
+                if (checkDoc.exists()) {
+                    showToast('ID phòng đã tồn tại, hãy chọn ID khác!', 'error');
+                    document.getElementById('createRoomIdInput').classList.add('border-red-400');
+                    return;
+                }
+                // Tạo phòng mới với ID này
                 const { serverTimestamp } = await import('https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js');
-                const roomRef = await addDoc(collection(db, 'study_rooms'), {
+                await setDoc(doc(db, 'study_rooms', newId), {
                     owner: user.uid,
                     createdAt: serverTimestamp(),
                     background: null
                 });
-                window.location.href = `study-room.html?id=${roomRef.id}`;
-            })();
+                modal.classList.add('hidden');
+                window.location.href = `study-room.html?id=${newId}`;
+            };
+            document.getElementById('createRoomIdInput').oninput = function() {
+                this.classList.remove('border-red-400');
+            };
             return;
         }
-
         // Delete button for a specific study room
         if (event.target.classList.contains('delete-study-room-btn')) {
             const roomIdToDelete = event.target.dataset.id;
@@ -643,9 +713,6 @@ function setupEventListeners() {
     // CẬP NHẬT: Gán sự kiện cho nút refresh của trang thống kê
     const refreshStatsBtn = document.getElementById('refresh-stats-btn');
     if (refreshStatsBtn) refreshStatsBtn.addEventListener('click', loadAndDisplayStats);
-
-    const refreshPublicLibraryBtn = document.getElementById('refresh-public-library-btn');
-    if (refreshPublicLibraryBtn) refreshPublicLibraryBtn.addEventListener('click', loadAndDisplayPublicLibrary);
 }
 
 // === KHỞI CHẠY ỨNG DỤNG ===

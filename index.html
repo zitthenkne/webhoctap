@@ -16,8 +16,8 @@
                 <i class="fas fa-bars"></i>
             </button>
             <a href="index.html" class="flex items-center gap-1 min-w-0">
-                <img src="assets/logo.png" alt="Zitthenkne Logo" class="w-9 h-9 rounded-full border-2 border-[#FFB6C1] shadow bg-white ml-1 hover:scale-105 transition-transform duration-200 flex-shrink-0">
-                <span class="font-bold text-[#FF69B4] text-base truncate block">Zitthenkne</span>
+                <img src="assets/logo.png" alt="Zitthenkne Logo" class="w-14 h-14 ml-1 hover:scale-105 transition-transform duration-200 flex-shrink-0">
+                <span class="font-extrabold text-[#FF69B4] text-2xl truncate block md:hidden">Zitthenkne</span>
             </a>
         </div>
         <img id="user-avatar-mobile" src="https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff" class="w-9 h-9 rounded-full border-2 border-[#D8BFD8] shadow ml-1 flex-shrink-0">
@@ -29,7 +29,7 @@
         <button id="sidebar-close-btn" class="md:hidden absolute top-3 right-3 text-gray-400 hover:text-pink-500 text-2xl z-50 bg-white/80 rounded-full p-1 shadow"><i class="fas fa-times"></i></button>
         <div class="p-4 flex flex-col items-center justify-center border-b border-pink-200 gap-1">
             <a href="index.html" class="flex flex-col items-center group">
-                <img src="assets/logo.png" alt="Zitthenkne Logo" class="w-12 h-12 rounded-full shadow-2xl border-2 border-[#FFB6C1] animate__animated animate__pulse animate__infinite group-hover:scale-105 transition-transform duration-200">
+                <img src="assets/logo.png" alt="Zitthenkne Logo" class="w-24 h-24 group-hover:scale-105 transition-transform duration-200">
                 <h1 class="text-lg font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-[#FF69B4] to-[#D8BFD8] tracking-wider drop-shadow-lg whitespace-nowrap group-hover:underline mt-1">Zitthenkne</h1>
             </a>
             <img id="user-avatar-sidebar" src="https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff" class="w-9 h-9 rounded-full border-2 border-[#D8BFD8] shadow mt-1">
@@ -40,7 +40,6 @@
                 <li><a href="#" data-target="dashboardContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm active:bg-[#FF69B4]/30 text-base gap-3"><i class="fas fa-home text-xl w-7 text-center"></i><span>Trang chủ</span></a></li>
                 <li><a href="#" data-target="createQuizContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-plus-circle text-xl w-7 text-center"></i><span>Tạo trắc nghiệm</span></a></li>
                 <li><a href="#" data-target="libraryContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-book text-xl w-7 text-center"></i><span>Thư viện</span></a></li>
-                <li><a href="#" data-target="publicLibraryContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-globe text-xl w-7 text-center"></i><span>Thư viện công cộng</span></a></li>
                 <li><a href="#" data-target="statsContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-chart-bar text-xl w-7 text-center"></i><span>Thống kê</span></a></li>
                 <li><a href="#" data-target="myStudyRoomsContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-chalkboard-teacher text-xl w-7 text-center"></i><span>Phòng học của tôi</span></a></li>
             </ul>
@@ -73,17 +72,17 @@
                 </div>
                 <div class="grid grid-cols-1 gap-5 sm:gap-8 md:grid-cols-2 lg:grid-cols-3 max-w-2xl md:max-w-6xl mx-auto px-3 sm:px-6">
                     <button type="button" id="selectCreateQuiz" class="group bg-white rounded-3xl shadow-xl p-7 sm:p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-[#FFB6C1] flex flex-col items-center gap-2 mb-2 px-2 sm:px-4">
-                        <i class="fas fa-file-alt text-4xl sm:text-5xl text-[#FF69B4] mb-2 transition-transform group-hover:scale-110"></i>
+                        <img src="assets/squirrel_quiz.png" alt="Squirrel Quiz" class="w-32 h-32 mb-2 transition-transform group-hover:scale-110 rounded-xl shadow border-2 border-pink-200 bg-white">
                         <h3 class="text-lg sm:text-xl font-bold text-gray-800">Tạo Trắc Nghiệm</h3>
                         <p class="text-gray-500 mt-1 text-sm sm:text-base">Biến file Excel/CSV của bạn thành một bài kiểm tra tương tác.</p>
                     </button>
                     <a href="#" id="selectStudyRoom" class="group bg-white rounded-3xl shadow-xl p-7 sm:p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-blue-300 flex flex-col items-center gap-2 mb-2 block px-2 sm:px-4">
-                        <i class="fas fa-users text-4xl sm:text-5xl text-blue-400 mb-2 transition-transform group-hover:scale-110"></i>
+                        <img src="assets/squirrel_group.png" alt="Squirrel Group" class="w-32 h-32 mb-2 transition-transform group-hover:scale-110 rounded-xl shadow border-2 border-blue-200 bg-white">
                         <h3 class="text-lg sm:text-xl font-bold text-gray-800">Đánh đề</h3>
                         <p class="text-gray-500 mt-1 text-sm sm:text-base">Tạo phòng học nhóm và cùng nhau giải đề trên bảng trắng.</p>
                     </a>
                     <button type="button" id="selectGpaCalculator" class="group bg-white rounded-3xl shadow-xl p-7 sm:p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-[#D8BFD8] flex flex-col items-center gap-2 mb-2 lg:col-start-1 md:col-span-2 lg:col-start-3 px-2 sm:px-4">
-                        <i class="fas fa-calculator text-4xl sm:text-5xl text-[#D8BFD8] mb-2 transition-transform group-hover:scale-110"></i>
+                        <img src="assets/squirrel_calculator.png" alt="Squirrel Calculator" class="w-32 h-32 mb-2 transition-transform group-hover:scale-110 rounded-xl shadow border-2 border-purple-200 bg-white">
                         <h3 class="text-lg sm:text-xl font-bold text-gray-800">Tính Điểm Hệ 4</h3>
                         <p class="text-gray-500 mt-1 text-sm sm:text-base">Quy đổi nhanh điểm số trắc nghiệm của bạn sang thang điểm 4.0.</p>
                     </button>
@@ -170,18 +169,6 @@
                 <div id="quiz-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     </div>
             </div>
-            
-            <div id="publicLibraryContent" class="content-panel hidden">
-                <div class="flex justify-between items-center mb-6">
-                    <h2 class="text-2xl font-bold text-[#FF69B4]">Thư viện công cộng</h2>
-                    <button type="button" id="refresh-public-library-btn" class="px-4 py-2 text-gray-600 hover:text-pink-500 transition" title="Tải lại"><i class="fas fa-sync-alt"></i></button>
-                </div>
-                <div class="mb-4 p-4 bg-blue-50 rounded-lg text-blue-800">
-                    <p><i class="fas fa-info-circle mr-2"></i> Đây là nơi các bộ đề chất lượng được chia sẻ bởi cộng đồng. Bạn có thể đóng góp bộ đề của mình khi lưu bài kiểm tra.</p>
-                </div>
-                <div id="public-quiz-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                </div>
-            </div>
 
             <div id="statsContent" class="content-panel hidden">
                 <div class="flex justify-between items-center mb-6">
@@ -204,13 +191,25 @@
 
             <div id="myStudyRoomsContent" class="content-panel hidden p-6">
                 <h2 class="text-2xl font-bold text-gray-800 mb-6">Phòng học của tôi</h2>
-                <div class="flex justify-end mb-4">
+                <div class="flex justify-end mb-4 gap-2">
+                    <button id="join-room-by-code-btn" class="px-6 py-2 bg-blue-200 text-blue-800 rounded-lg hover:bg-blue-300 transition">
+                        <i class="fas fa-key mr-2"></i>Vào phòng bằng mã
+                    </button>
                     <button id="create-new-study-room-btn" class="px-6 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition">
                         <i class="fas fa-plus-circle mr-2"></i> Tạo phòng mới
                     </button>
                 </div>
                 <div id="my-study-rooms-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <!-- Các phòng học của bạn sẽ được tải vào đây -->
+                </div>
+                <!-- Modal sửa ID phòng học -->
+                <div id="editRoomIdModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden px-2">
+                    <div class="bg-white rounded-2xl shadow-2xl p-4 sm:p-8 w-full max-w-md relative">
+                        <button type="button" id="closeEditRoomIdModalBtn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-700"><i class="fas fa-times text-2xl"></i></button>
+                        <h2 class="text-2xl font-bold text-center mb-6 text-[#FF69B4]">Sửa mã phòng học</h2>
+                        <input type="text" id="editRoomIdInput" placeholder="Nhập mã phòng mới" class="w-full px-4 py-2 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] mb-4 transition-all duration-200">
+                        <button type="button" id="saveEditRoomIdBtn" class="w-full px-6 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition">Lưu thay đổi</button>
+                    </div>
                 </div>
             </div>
         </main>
@@ -262,6 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const joinRoomBtn = document.getElementById('joinRoomBtn');
     const joinRoomIdInput = document.getElementById('joinRoomIdInput');
     const myStudyRoomsList = document.getElementById('my-study-rooms-list');
+    const joinRoomByCodeBtn = document.getElementById('join-room-by-code-btn');
 
     const joinRoomById = (id) => {
         const roomId = id ? id.trim() : '';
@@ -276,6 +276,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (selectStudyRoom) {
         selectStudyRoom.addEventListener('click', (e) => {
             e.preventDefault();
+            // showContent('myStudyRoomsContent', 'Phòng học của tôi');
+            // Không mở modal nhập mã phòng nữa
+            showContent('myStudyRoomsContent', 'Phòng học của tôi');
+        });
+    }
+    if (joinRoomByCodeBtn) {
+        joinRoomByCodeBtn.addEventListener('click', () => {
             joinRoomModal.classList.remove('hidden');
             joinRoomIdInput.value = '';
             joinRoomIdInput.classList.remove('border-red-400');
@@ -383,6 +390,75 @@ if (squirrelFloating) {
         }
     });
 }
+// ================== SỬA ID PHÒNG HỌC ==================
+// Giả sử phòng học lưu ở localStorage với key 'myStudyRooms', dạng mảng [{id, name,...}]
+// Hàm render lại danh sách phòng học, thêm nút Sửa
+function renderMyStudyRooms() {
+    const myStudyRoomsList = document.getElementById('my-study-rooms-list');
+    if (!myStudyRoomsList) return;
+    const rooms = JSON.parse(localStorage.getItem('myStudyRooms') || '[]');
+    myStudyRoomsList.innerHTML = rooms.map((room, idx) => `
+        <div class="bg-white rounded-xl shadow p-4 flex flex-col gap-2 border border-pink-100">
+            <div class="flex items-center justify-between">
+                <div>
+                    <div class="font-bold text-lg text-pink-600">${room.name || 'Phòng học'}</div>
+                    <div class="text-gray-500 text-sm">ID: <span class="font-mono">${room.id}</span></div>
+                </div>
+                <button class="edit-room-id-btn px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition text-xs font-semibold" data-idx="${idx}"><i class="fas fa-edit mr-1"></i>Sửa</button>
+            </div>
+            <!-- Thêm các thông tin khác nếu cần -->
+        </div>
+    `).join('');
+}
+
+// Xử lý modal sửa ID
+let editingRoomIdx = null;
+document.addEventListener('DOMContentLoaded', () => {
+    // Nếu chưa có phòng học nào thì tạo dữ liệu mẫu
+    if (!localStorage.getItem('myStudyRooms') || JSON.parse(localStorage.getItem('myStudyRooms')).length === 0) {
+        localStorage.setItem('myStudyRooms', JSON.stringify([
+            {id: 'room1', name: 'Phòng Toán'},
+            {id: 'room2', name: 'Phòng Lý'}
+        ]));
+    }
+    renderMyStudyRooms();
+    // Sự kiện click nút Sửa
+    document.getElementById('my-study-rooms-list').addEventListener('click', function(e) {
+        const btn = e.target.closest('.edit-room-id-btn');
+        if (btn) {
+            editingRoomIdx = btn.getAttribute('data-idx');
+            const rooms = JSON.parse(localStorage.getItem('myStudyRooms') || '[]');
+            document.getElementById('editRoomIdInput').value = rooms[editingRoomIdx]?.id || '';
+            document.getElementById('editRoomIdModal').classList.remove('hidden');
+        }
+    });
+    // Đóng modal
+    document.getElementById('closeEditRoomIdModalBtn').addEventListener('click', function() {
+        document.getElementById('editRoomIdModal').classList.add('hidden');
+    });
+    // Lưu ID mới
+    document.getElementById('saveEditRoomIdBtn').addEventListener('click', function() {
+        const newId = document.getElementById('editRoomIdInput').value.trim();
+        if (!newId) {
+            document.getElementById('editRoomIdInput').classList.add('border-red-400');
+            return;
+        }
+        const rooms = JSON.parse(localStorage.getItem('myStudyRooms') || '[]');
+        // Kiểm tra trùng ID
+        if (rooms.some((r, idx) => r.id === newId && idx != editingRoomIdx)) {
+            alert('ID phòng đã tồn tại!');
+            return;
+        }
+        rooms[editingRoomIdx].id = newId;
+        localStorage.setItem('myStudyRooms', JSON.stringify(rooms));
+        document.getElementById('editRoomIdModal').classList.add('hidden');
+        renderMyStudyRooms();
+    });
+    // Xóa viền đỏ khi nhập lại
+    document.getElementById('editRoomIdInput').addEventListener('input', function() {
+        this.classList.remove('border-red-400');
+    });
+});
 </script>
 
 </body>

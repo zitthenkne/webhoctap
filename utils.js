@@ -53,3 +53,5 @@ export function showToast(message, type = 'info', duration = 3000) {
         toast.addEventListener('transitionend', () => toast.remove());
     }, duration);
 }
+
+window.showToast = showToast;
