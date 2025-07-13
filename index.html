@@ -42,6 +42,7 @@
                 <li><a href="#" data-target="libraryContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-book text-xl w-7 text-center"></i><span>Thư viện</span></a></li>
                 <li><a href="#" data-target="statsContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-chart-bar text-xl w-7 text-center"></i><span>Thống kê</span></a></li>
                 <li><a href="#" data-target="myStudyRoomsContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-chalkboard-teacher text-xl w-7 text-center"></i><span>Phòng học của tôi</span></a></li>
+                <li><a href="waiting-room.html" id="medicalRecordListBtn" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-green-200/40 hover:to-green-100/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-notes-medical text-xl w-7 text-center"></i><span>Danh sách bệnh án</span></a></li>
             </ul>
         </nav>
     </aside>
@@ -85,6 +86,11 @@
                         <img src="assets/squirrel_calculator.png" alt="Squirrel Calculator" class="w-32 h-32 mb-2 transition-transform group-hover:scale-110 rounded-xl shadow border-2 border-purple-200 bg-white">
                         <h3 class="text-lg sm:text-xl font-bold text-gray-800">Tính Điểm Hệ 4</h3>
                         <p class="text-gray-500 mt-1 text-sm sm:text-base">Quy đổi nhanh điểm số trắc nghiệm của bạn sang thang điểm 4.0.</p>
+                    </button>
+                    <button type="button" id="selectWriteMedicalRecord" class="group bg-white rounded-3xl shadow-xl p-7 sm:p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-green-300 flex flex-col items-center gap-2 mb-2 px-2 sm:px-4">
+                        <img src="assets/squirrel_benhan.png" alt="Squirrel Medical" class="w-32 h-32 mb-2 transition-transform group-hover:scale-110 rounded-xl shadow border-2 border-green-200 bg-white">
+                        <h3 class="text-lg sm:text-xl font-bold text-gray-800">Viết bệnh án</h3>
+                        <p class="text-gray-500 mt-1 text-sm sm:text-base">Vào phòng chờ để bắt đầu viết bệnh án lâm sàng.</p>
                     </button>
                 </div>
             </div>
@@ -279,6 +285,13 @@ document.addEventListener('DOMContentLoaded', () => {
             // showContent('myStudyRoomsContent', 'Phòng học của tôi');
             // Không mở modal nhập mã phòng nữa
             showContent('myStudyRoomsContent', 'Phòng học của tôi');
+        });
+    }
+    // Nút Viết bệnh án
+    const selectWriteMedicalRecord = document.getElementById('selectWriteMedicalRecord');
+    if (selectWriteMedicalRecord) {
+        selectWriteMedicalRecord.addEventListener('click', function() {
+            window.location.href = 'waiting-room.html';
         });
     }
     if (joinRoomByCodeBtn) {

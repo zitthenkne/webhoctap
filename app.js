@@ -50,7 +50,9 @@ function showContent(targetId, title = 'Dashboard') {
     if (activeLink) {
         activeLink.classList.add('bg-pink-100', 'font-bold');
     }
-    pageTitle.textContent = title;
+    if (pageTitle) {
+        pageTitle.textContent = title;
+    }
     if (window.innerWidth < 768) {
         sidebar.classList.add('hidden');
     }
@@ -602,30 +604,34 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 function setupEventListeners() {
-    closeModalBtn.addEventListener('click', toggleAuthModal);
-    loginBtn.addEventListener('click', handleLogin);
-    signupBtn.addEventListener('click', handleSignup);
-    uploadArea.addEventListener('click', () => fileInput.click()); // Giữ nguyên
-    fileInput.addEventListener('change', handleFileSelect); // Giữ nguyên
-    processBtn.addEventListener('click', saveAndStartQuiz);
-    saveBtnPreQuiz.addEventListener('click', saveOnly);
-    menuToggleBtn.addEventListener('click', () => sidebar.classList.toggle('hidden'));
-    selectCreateQuizBtn.addEventListener('click', () => showContent('createQuizContent', 'Tạo trắc nghiệm'));
+    if (closeModalBtn) closeModalBtn.addEventListener('click', toggleAuthModal);
+    if (loginBtn) loginBtn.addEventListener('click', handleLogin);
+    if (signupBtn) signupBtn.addEventListener('click', handleSignup);
+    if (uploadArea) uploadArea.addEventListener('click', () => fileInput.click());
+    if (fileInput) fileInput.addEventListener('change', handleFileSelect);
+    if (processBtn) processBtn.addEventListener('click', saveAndStartQuiz);
+    if (saveBtnPreQuiz) saveBtnPreQuiz.addEventListener('click', saveOnly);
+    if (menuToggleBtn) menuToggleBtn.addEventListener('click', () => sidebar.classList.toggle('hidden'));
+    if (selectCreateQuizBtn) selectCreateQuizBtn.addEventListener('click', () => showContent('createQuizContent', 'Tạo trắc nghiệm'));
     
     // Correctly handle the "Đánh đề" button click
-    selectStudyRoomBtn.addEventListener('click', (event) => {
+    if (selectStudyRoomBtn) selectStudyRoomBtn.addEventListener('click', (event) => {
         event.preventDefault(); // Prevent the default <a> tag behavior
         showContent('myStudyRoomsContent', 'Phòng học của tôi');
     });
-    selectGpaCalculatorBtn.addEventListener('click', () => showContent('gpaCalculatorContent', 'Tính điểm hệ 4'));
-    calculateGpaBtn.addEventListener('click', calculateGPA);
-    downloadTemplateBtn.addEventListener('click', downloadTemplate);
+    if (selectGpaCalculatorBtn) selectGpaCalculatorBtn.addEventListener('click', () => showContent('gpaCalculatorContent', 'Tính điểm hệ 4'));
+    if (calculateGpaBtn) calculateGpaBtn.addEventListener('click', calculateGPA);
+    if (downloadTemplateBtn) downloadTemplateBtn.addEventListener('click', downloadTemplate);
     navLinks.forEach(link => {
         link.addEventListener('click', (event) => {
-            event.preventDefault();
             const targetId = link.getAttribute('data-target');
-            const title = link.querySelector('span').textContent;
-            showContent(targetId, title);
+            // Chỉ xử lý như SPA nếu có data-target
+            if (targetId) {
+                event.preventDefault();
+                const title = link.querySelector('span').textContent;
+                showContent(targetId, title);
+            }
+            // Nếu không có data-target, để trình duyệt tự điều hướng qua href
         });
     });
 
@@ -695,18 +701,20 @@ function setupEventListeners() {
     });
 
     const libraryContainer = document.getElementById('libraryContent');
-    libraryContainer.addEventListener('click', (event) => {
-        const target = event.target.closest('button');
-        if (!target) return;
-        const quizId = target.getAttribute('data-id');
-        
-        if (target.classList.contains('edit-quiz-btn')) {
-            const currentTitle = target.getAttribute('data-title');
-            editQuizSetTitle(quizId, currentTitle);
-        } else if (target.classList.contains('delete-quiz-btn')) {
-            deleteQuizSet(quizId);
-        }
-    });
+    if (libraryContainer) {
+        libraryContainer.addEventListener('click', (event) => {
+            const target = event.target.closest('button');
+            if (!target) return;
+            const quizId = target.getAttribute('data-id');
+            
+            if (target.classList.contains('edit-quiz-btn')) {
+                const currentTitle = target.getAttribute('data-title');
+                editQuizSetTitle(quizId, currentTitle);
+            } else if (target.classList.contains('delete-quiz-btn')) {
+                deleteQuizSet(quizId);
+            }
+        });
+    }
     const refreshLibraryBtn = document.getElementById('refresh-library-btn');
     if(refreshLibraryBtn) refreshLibraryBtn.addEventListener('click', loadAndDisplayLibrary);
     
@@ -716,5 +724,7 @@ function setupEventListeners() {
 }
 
 // === KHỞI CHẠY ỨNG DỤNG ===
-setupEventListeners();
-showContent('dashboardContent', 'Trang chủ');
+document.addEventListener('DOMContentLoaded', () => {
+    setupEventListeners();
+    showContent('dashboardContent', 'Trang chủ');
+});
