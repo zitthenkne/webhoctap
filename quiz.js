@@ -422,7 +422,8 @@ export function initQuiz(params) {
             }
             quizQuestionCountInfo.textContent = `Tìm thấy ${questions.length} câu hỏi.`;
             currentQuizData = {
-                questions: questions,
+                // Gán luôn phần giải thích từ file excel vào userExplain để có thể chỉnh sửa và lưu lại
+                questions: questions.map(q => ({ ...q, userExplain: q.explain || '' })),
                 currentQuestionIndex: 0,
                 quizTitle: file.name.replace(/\.(xlsx|xls)$/, '')
             };

@@ -12,6 +12,9 @@ const pageTitle = document.getElementById('pageTitle');
 const userMenuButton = document.getElementById('user-menu-button');
 const userName = document.getElementById('user-name');
 const userAvatar = document.getElementById('user-avatar');
+const userNameSidebar = document.getElementById('user-name-sidebar');
+const userAvatarSidebar = document.getElementById('user-avatar-sidebar');
+const userAvatarMobile = document.getElementById('user-avatar-mobile');
 const authModal = document.getElementById('authModal');
 const closeModalBtn = document.getElementById('closeModalBtn');
 const loginBtn = document.getElementById('loginBtn');
@@ -68,7 +71,37 @@ function showContent(targetId, title = 'Dashboard') {
     }
 }
 
-onAuthStateChanged(auth, user => { if (user) { userName.textContent = user.email.split('@')[0]; userAvatar.src = `https://ui-avatars.com/api/?name=${user.email[0]}&background=FF69B4&color=fff`; userMenuButton.onclick = handleLogout; } else { userName.textContent = 'Khách'; userAvatar.src = `https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff`; userMenuButton.onclick = toggleAuthModal; } });
+onAuthStateChanged(auth, user => {
+    if (user) {
+        const displayName = user.displayName || user.email.split('@')[0];
+        const avatarUrl = `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=FF69B4&color=fff`;
+        if (userName) userName.textContent = displayName;
+        if (userAvatar) {
+    userAvatar.src = avatarUrl;
+    userAvatar.style.cursor = 'pointer';
+    userAvatar.onclick = () => window.location.href = 'profile.html';
+}
+        if (userNameSidebar) userNameSidebar.textContent = displayName;
+        if (userAvatarSidebar) {
+    userAvatarSidebar.src = avatarUrl;
+    userAvatarSidebar.style.cursor = 'pointer';
+    userAvatarSidebar.onclick = () => window.location.href = 'profile.html';
+}
+        if (userAvatarMobile) {
+    userAvatarMobile.src = avatarUrl;
+    userAvatarMobile.style.cursor = 'pointer';
+    userAvatarMobile.onclick = () => window.location.href = 'profile.html';
+}
+        userMenuButton.onclick = handleLogout;
+    } else {
+        if (userName) userName.textContent = 'Khách';
+        if (userAvatar) userAvatar.src = `https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff`;
+        if (userNameSidebar) userNameSidebar.textContent = 'Khách';
+        if (userAvatarSidebar) userAvatarSidebar.src = `https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff`;
+        if (userAvatarMobile) userAvatarMobile.src = `https://ui-avatars.com/api/?name=?&background=D8BFD8&color=fff`;
+        userMenuButton.onclick = toggleAuthModal;
+    }
+});
 async function handleLogout() { if (confirm('Bạn có chắc muốn đăng xuất?')) { await signOut(auth); showToast('Đã đăng xuất!', 'info'); } }
 function toggleAuthModal() { authModal.classList.toggle('hidden'); }
 async function handleLogin() { const email = document.getElementById('emailInput').value; const password = document.getElementById('passwordInput').value; if (!email || !password) return showToast('Vui lòng nhập đủ thông tin.', 'warning'); try { await signInWithEmailAndPassword(auth, email, password); toggleAuthModal(); showToast('Đăng nhập thành công!', 'success'); } catch (error) { showToast('Đăng nhập thất bại: ' + error.message, 'error'); } }
@@ -92,14 +125,14 @@ function parseFile(file) {
 
                     return {
                         question: row[0],
-                        // SỬA ĐỔI 1: Đổi tên thuộc tính 'answers' thành 'options'
-                        options: [row[1], row[2], row[3], row[4]].filter(ans => ans != null && String(ans).trim() !== ''),
+                        // SỬA LỖI 1: Đổi 'options' trở lại thành 'answers' để trang quiz có thể đọc.
+                        answers: [row[1], row[2], row[3], row[4]].filter(ans => ans != null && String(ans).trim() !== ''),
                         
-                        // SỬA ĐỔI 2: Lưu trữ đáp án đúng dưới dạng giá trị (1,2,3,4) thay vì index
-                        answer: (!isNaN(correctAnswerValue) && correctAnswerValue >= 1 && correctAnswerValue <= 4) ? correctAnswerValue : null,
+                        // SỬA LỖI 2: Chuyển đổi đáp án đúng (1,2,3,4) thành chỉ số (index) 0,1,2,3 để logic kiểm tra hoạt động chính xác.
+                        correctAnswerIndex: (!isNaN(correctAnswerValue) && correctAnswerValue >= 1 && correctAnswerValue <= 4) ? correctAnswerValue - 1 : null,
                         
-                        // SỬA ĐỔI 3: Đổi tên thuộc tính 'explanation' thành 'explain' và dùng chuỗi rỗng làm mặc định
-                        explain: row[7] || '', 
+                        // SỬA LỖI 3: Đổi 'explain' trở lại thành 'explanation' để trang quiz có thể hiển thị giải thích.
+                        explanation: row[7] || '', 
                         
                         topic: row[6] || 'Chung' // Giữ lại thuộc tính topic để hiển thị thông tin
                     };
@@ -275,17 +308,20 @@ function renderLibrary(quizzesToDisplay) {
         const card = document.createElement('div');
         card.className = 'bg-white rounded-lg shadow-md p-4 flex flex-col';
         card.innerHTML = `
-            <div class="flex-grow">
+            <div class="flex-grow relative">
                 <h3 class="text-md font-bold text-gray-700">${quizSet.title}</h3>
                 <p class="text-sm text-gray-500 mt-2">${quizSet.questionCount} câu hỏi</p>
-                <p class="text-xs text-gray-400 mt-1">Lưu ngày: ${new Date(quizSet.createdAt.toDate()).toLocaleDateString()}</p> 
+                <p class="text-xs text-gray-400 mt-1">Lưu ngày: ${new Date(quizSet.createdAt.toDate()).toLocaleDateString()}</p>
+                <button class="quiz-menu-btn absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-pink-500 focus:outline-none" data-id="${quizSet.id}" title="Tuỳ chọn"><i class="fas fa-ellipsis-h"></i></button>
+                <div class="quiz-menu hidden absolute top-10 right-2 bg-white rounded-lg shadow-lg border border-pink-100 z-20 min-w-[160px]">
+                    <button class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-pink-50 quiz-history-btn" data-id="${quizSet.id}"><i class="fas fa-history mr-2 text-pink-400"></i>Xem lịch sử làm bài</button>
+                    <button class="block w-full text-left px-4 py-2 text-blue-700 hover:bg-pink-50 edit-quiz-content-btn" data-id="${quizSet.id}"><i class="fas fa-pen-alt mr-2 text-blue-400"></i>Sửa câu hỏi</button>
+                    <button class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-pink-50 edit-quiz-btn" data-id="${quizSet.id}" data-title="${quizSet.title}"><i class="fas fa-edit mr-2 text-blue-400"></i>Sửa tên</button>
+                    <button class="block w-full text-left px-4 py-2 text-red-700 hover:bg-pink-50 delete-quiz-btn" data-id="${quizSet.id}"><i class="fas fa-trash-alt mr-2 text-red-400"></i>Xóa</button>
+                </div>
             </div>
             <div class="mt-4 flex flex-col gap-2">
-                <a href="quiz.html?id=${quizSet.id}" class="w-full text-center px-4 py-2 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition text-sm">Bắt đầu</a>
-                <div class="flex gap-2">
-                    <button data-id="${quizSet.id}" data-title="${quizSet.title}" class="edit-quiz-btn w-1/2 text-center px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition text-xs">Sửa</button>
-                    <button data-id="${quizSet.id}" class="delete-quiz-btn w-1/2 text-center px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition text-xs">Xóa</button>
-                </div>
+                <a href="quiz.html?id=${quizSet.id}" class="w-full text-center px-4 py-3 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition text-lg font-bold">Bắt đầu</a>
             </div>
         `;
         quizListContainer.appendChild(card);

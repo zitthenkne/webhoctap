@@ -5,6 +5,34 @@ import { checkAndAwardAchievement, achievements } from './achievements.js';
 import { showToast } from './utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
+    // --- Kiểm tra trạng thái quiz trong localStorage ---
+    const savedStateStr = localStorage.getItem('quizState');
+    let askedToRestore = false;
+    if (savedStateStr) {
+        try {
+            const savedState = JSON.parse(savedStateStr);
+            const quizId = (new URLSearchParams(window.location.search)).get('id');
+            // Chỉ hỏi tiếp tục nếu trạng thái chưa hoàn thành
+            if (savedState.quizId === quizId && savedState.userAnswers && savedState.userAnswers.length === savedState.questionsLength && !savedState.finished) {
+                askedToRestore = true;
+                setTimeout(() => {
+                    if (confirm('Bạn có muốn tiếp tục bài làm trước đó không?')) {
+                        // Đợi dữ liệu quiz load xong mới khôi phục
+                        const restoreInterval = setInterval(() => {
+                            if (originalQuestions && originalQuestions.length === savedState.questionsLength) {
+                                clearInterval(restoreInterval);
+                                startQuizMode([...originalQuestions], 'normal', savedState);
+                            }
+                        }, 200);
+                    } else {
+                        clearQuizState();
+                    }
+                }, 400);
+            }
+        } catch (err) { console.warn('Không thể khôi phục trạng thái quiz:', err); }
+    }
+    // --- Kết thúc kiểm tra trạng thái quiz ---
+
     // Lấy các phần tử UI cần thiết
     const quizLanding = document.getElementById('quiz-landing');
     const quizContainer = document.getElementById('quiz-container');
@@ -24,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let quizStartTime;            // Thời điểm bắt đầu
     let quizTimerInterval;        // Biến cho đồng hồ đếm giờ
     let quizMode = 'normal';      // 'normal' hoặc 'practice'
+    let quizOptions = { isTimed: true }; // NEW: To store session options
     let _allFlashcardQuestions = []; // Lưu tất cả câu hỏi với trạng thái _isKnown cho toàn bộ phiên
     let flashcardQuestions = [];     // Bộ câu hỏi đang hiển thị (lượt đầu hoặc ôn tập)
     let reviewQueue = [];            // Các câu hỏi được đánh dấu "chưa thuộc" trong lượt hiện tại
@@ -471,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // === LOGIC LÀM BÀI KIỂM TRA ===
 
-    function startQuizMode(questionsArray, mode = 'normal') {
+    function startQuizMode(questionsArray, mode = 'normal', restoreState = null) {
         quizMode = mode;
         questions = questionsArray;
 
@@ -480,12 +509,25 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        currentIndex = 0;
-        userAnswers = new Array(questions.length).fill(null);
-        score = 0;
-        quizStartTime = new Date();
+        if (restoreState) {
+            // Khôi phục trạng thái từ localStorage
+            currentIndex = restoreState.currentIndex || 0;
+            userAnswers = restoreState.userAnswers || new Array(questions.length).fill(null);
+            score = restoreState.score || 0;
+            markedQuestions = restoreState.markedQuestions || [];
+            quizStartTime = restoreState.quizStartTime ? new Date(restoreState.quizStartTime) : new Date();
+        } else {
+            currentIndex = 0;
+            userAnswers = new Array(questions.length).fill(null);
+            score = 0;
+            quizStartTime = new Date();
+            markedQuestions = [];
+        }
+
         if (quizTimerInterval) clearInterval(quizTimerInterval);
-        startTimer();
+        if (quizOptions.isTimed) {
+            startTimer();
+        }
 
         quizLanding.classList.add('hidden');
         quizContainer.classList.remove('hidden');
@@ -495,8 +537,10 @@ document.addEventListener('DOMContentLoaded', () => {
         resultsSection.classList.add('hidden');
 
         showQuestion();
+        saveQuizState(); // Lưu trạng thái khi bắt đầu
     }
 
+    // === LOGIC LÀM BÀI KIỂM TRA ===
     function renderQuizProgressBar() {
         // Thêm progress bar và navigator vào quizSection
         const answeredCount = userAnswers.filter(a => a !== null).length;
@@ -522,6 +566,24 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     }
 
+    function saveQuizState() {
+        // Lưu trạng thái quiz vào localStorage
+        const state = {
+            quizId: (quizData && quizData.id) || (new URLSearchParams(window.location.search)).get('id'),
+            currentIndex,
+            userAnswers,
+            score,
+            markedQuestions,
+            quizStartTime: quizStartTime ? quizStartTime.toISOString() : null,
+            questionsLength: questions.length
+        };
+        localStorage.setItem('quizState', JSON.stringify(state));
+    }
+
+    function clearQuizState() {
+        localStorage.removeItem('quizState');
+    }
+
     function showQuestion() {
         updateProgressBar();
         const question = questions[currentIndex];
@@ -542,17 +604,23 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         let title = quizMode === 'practice' ? 'Luyện tập lại' : `Câu hỏi ${currentIndex + 1}`;
+        saveQuizState(); // Lưu trạng thái mỗi lần chuyển câu
         quizSection.innerHTML = `
         ${renderQuizProgressBar()}
         <div class="bg-white rounded-lg shadow-lg p-6 fade-in">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-gray-700">${title}</h2>
-                <div id="timer" class="text-lg font-semibold text-[#FF69B4]">00:00</div>
+                <div id="timer" class="text-lg font-semibold text-[#FF69B4] ${quizOptions.isTimed ? '' : 'hidden'}">00:00</div>
+            </div>
+            <div class="mb-2 flex items-center gap-2">
+                <span class="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold border border-blue-200">
+                    <i class="fas fa-tag mr-1"></i> Chủ đề: ${question.topic ? question.topic : 'Chung'}
+                </span>
             </div>
             <h3 class="text-2xl font-semibold text-gray-800 my-6 text-center">${question.question}</h3>
             <div id="answers-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 ${answerOptions.map((answer, index) => `
-                    <button class="answer-btn p-4 border border-pink-200 rounded-lg text-left hover:bg-[#FFB6C1]/50 hover:border-[#FF69B4] transition" data-index="${index}">
+                    <button class="answer-btn p-4 border border-pink-200 rounded-lg text-left hover:bg-[#FFB6C1]/50 hover:border-[#FF69B4] transition text-lg" data-index="${index}">
                         ${answer}
                     </button>
                 `).join('')}
@@ -566,8 +634,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
             </div>
             <div id="explanation-area" class="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded hidden">
-                <h4 class="font-bold text-yellow-800">Giải thích</h4>
-                <p class="text-yellow-700 mt-1">${question.explanation || 'Không có giải thích.'}</p>
+                <h4 class="font-bold text-yellow-800 text-lg">Giải thích</h4>
+                <p class="text-yellow-700 mt-1 text-base">${question.explanation || 'Không có giải thích.'}</p>
             </div>
             <div class="mt-8 flex justify-between">
                 <button id="prevBtn" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition ${currentIndex === 0 || quizMode === 'practice' ? 'invisible' : ''}">
@@ -579,9 +647,44 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         </div>
     `;
-    document.querySelectorAll('.answer-btn').forEach(button => {
-        button.addEventListener('click', handleAnswerClick);
-    });
+    // Nếu đã trả lời câu này thì tự động hiển thị đáp án đã chọn, đúng/sai, và giải thích
+    const answeredIdx = userAnswers[currentIndex];
+    if (answeredIdx !== null && answeredIdx !== undefined) {
+        document.querySelectorAll('.answer-btn').forEach((btn, idx) => {
+            btn.disabled = true;
+            const isCorrectAnswer = (idx === questions[currentIndex].correctAnswerIndex);
+            const isSelectedAnswer = (idx === answeredIdx);
+
+            // Đánh dấu đáp án đã chọn
+            if (isSelectedAnswer) {
+                btn.classList.add('ring-2', 'ring-[#FF69B4]');
+            }
+            // Highlight đúng/sai
+            if (isCorrectAnswer) {
+                btn.classList.add('bg-green-200', 'border-green-400', 'text-green-800', 'font-bold', 'hover:bg-green-200', 'hover:border-green-400');
+                if (isSelectedAnswer) btn.classList.add('correct-answer-pulse');
+            } else if (isSelectedAnswer) {
+                btn.classList.add('bg-red-200', 'border-red-400', 'text-red-800', 'wrong-answer-shake', 'hover:bg-red-200', 'hover:border-red-400');
+            } else {
+                // Với các đáp án còn lại, loại bỏ hiệu ứng hover để tránh gây nhiễu
+                btn.classList.remove('hover:bg-[#FFB6C1]/50', 'hover:border-[#FF69B4]');
+            }
+        });
+        // Hiện giải thích
+        const explanationArea = document.getElementById('explanation-area');
+        if (explanationArea) explanationArea.classList.remove('hidden');
+        // Hiện nút tiếp theo
+        const nextBtn = document.getElementById('nextBtn');
+        if (nextBtn) {
+            nextBtn.classList.remove('hidden');
+            nextBtn.addEventListener('click', showNextQuestion, { once: true });
+        }
+    } else {
+        // Nếu chưa trả lời thì gắn sự kiện click như cũ
+        document.querySelectorAll('.answer-btn').forEach(button => {
+            button.addEventListener('click', handleAnswerClick);
+        });
+    }
     if (quizMode === 'normal' && currentIndex > 0) {
         document.getElementById('prevBtn').addEventListener('click', showPreviousQuestion);
     }
@@ -626,6 +729,16 @@ function showPreviousQuestion() {
 
 // === KẾT THÚC BÀI KIỂM TRA ===
 function endQuiz() {
+    // Đánh dấu đã hoàn thành vào localStorage để không hỏi popup nữa
+    try {
+        const savedStateStr = localStorage.getItem('quizState');
+        if (savedStateStr) {
+            const savedState = JSON.parse(savedStateStr);
+            savedState.finished = true;
+            localStorage.setItem('quizState', JSON.stringify(savedState));
+        }
+    } catch (e) {}
+
     // Tính thời gian làm bài
     let totalTime = 0;
     if (quizStartTime) {
@@ -714,11 +827,18 @@ function showResults(totalTime) {
     }).join('');
 
     resultsSection.innerHTML = `
-        <div class="bg-white rounded-lg shadow-lg p-8 text-center fade-in">
-            <h2 class="text-3xl font-bold text-[#FF69B4]">Hoàn thành!</h2>
-            <p class="text-gray-600 mt-2">Đây là kết quả của bạn:</p>
+        <div class="bg-gradient-to-br from-pink-100 via-white to-pink-200 rounded-2xl shadow-2xl p-10 text-center fade-in animate__animated animate__bounceIn">
+            <div class="flex flex-col items-center justify-center mb-6">
+                <div class="w-24 h-24 rounded-full bg-[#FF69B4]/10 flex items-center justify-center shadow-lg mb-2 animate__animated animate__tada">
+                    <i class="fas fa-crown text-5xl text-[#FF69B4] animate__animated animate__heartBeat"></i>
+                </div>
+                <h2 class="text-4xl font-extrabold text-[#FF69B4] drop-shadow mb-2">Hoàn thành!</h2>
+                <p class="text-gray-600">Đây là kết quả của bạn:</p>
+            </div>
             <div class="my-8">
-                <p class="text-5xl font-bold text-[#FF69B4]">${percentage}%</p>
+                <p class="text-6xl font-extrabold text-[#FF69B4] animate__animated animate__pulse animate__infinite">
+                    ${percentage}%
+                </p>
                 <p class="text-lg text-gray-700 mt-2">Đúng ${score}/${questions.length} câu</p>
                 <p class="text-sm text-gray-500 mt-1">Bạn đã trả lời ${questions.length - userAnswers.filter(a => a === null).length} / ${questions.length} câu</p>
             </div>
@@ -730,14 +850,14 @@ function showResults(totalTime) {
                 ${markedList.length > 0 ? `<div><span class="font-bold text-yellow-600">Câu đã đánh dấu:</span> ${markedList.join(', ')}</div>` : ''}
             </div>
             <div class="mt-8 flex justify-center flex-wrap gap-4">
-                <button id="restartQuizBtn" class="px-6 py-3 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition">
+                <button id="restartQuizBtn" class="px-6 py-3 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition shadow-lg">
                     <i class="fas fa-redo mr-2"></i> Làm lại
                 </button>
                 ${showPracticeButton ? `
-                    <button id="practiceIncorrectBtn" class="px-6 py-3 bg-orange-400 text-white rounded-lg hover:bg-orange-500 transition">
+                    <button id="practiceIncorrectBtn" class="px-6 py-3 bg-orange-400 text-white rounded-lg hover:bg-orange-500 transition shadow-lg">
                         <i class="fas fa-pencil-alt mr-2"></i> Luyện tập câu sai
                     </button>` : ''}
-                <a href="index.html" class="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition">
+                <a href="index.html" class="px-6 py-3 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition shadow-lg">
                     <i class="fas fa-home mr-2"></i> Về trang chủ
                 </a>
             </div>
@@ -749,7 +869,19 @@ function showResults(totalTime) {
             </div>
         </div>
     `;
-    document.getElementById('restartQuizBtn').addEventListener('click', () => startQuizMode([...originalQuestions], 'normal'));
+    document.getElementById('restartQuizBtn').addEventListener('click', () => {
+        clearQuizState(); // Xóa trạng thái khi làm lại
+        // Khi làm lại, vẫn tôn trọng các tùy chọn đã chọn ban đầu
+        let questionsToRestart = [...originalQuestions];
+        const shouldShuffle = document.getElementById('shuffle-questions-checkbox')?.checked || false;
+        if (shouldShuffle) {
+            for (let i = questionsToRestart.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [questionsToRestart[i], questionsToRestart[j]] = [questionsToRestart[j], questionsToRestart[i]];
+            }
+        }
+        startQuizMode(questionsToRestart, 'normal');
+    });
     if (showPracticeButton) {
         document.getElementById('practiceIncorrectBtn').addEventListener('click', startIncorrectPracticeMode);
     }
@@ -773,6 +905,7 @@ function formatTime(seconds) {
 // === HÀM ĐẾM GIỜ CHO QUIZ ===
 function startTimer() {
     const timerElement = document.getElementById('timer');
+    if (!timerElement) return; // Guard clause if timer is disabled
     let totalSeconds = (quizData && quizData.timeLimit) ? quizData.timeLimit * 60 : 30 * 60; // Mặc định 30 phút nếu không có timeLimit
     let warningShown = false;
     if (quizTimerInterval) clearInterval(quizTimerInterval);
@@ -838,25 +971,37 @@ function handleAnswerClick(e) {
     if (userAnswers[currentIndex] !== null) return;
 
     userAnswers[currentIndex] = selectedIdx;
-    if (selectedIdx === questions[currentIndex].correctAnswerIndex) {
+    const isCorrect = selectedIdx === questions[currentIndex].correctAnswerIndex;
+    if (isCorrect) {
         score++;
     }
 
-    // Highlight đáp án đã chọn
+    // Vô hiệu hóa và hiển thị kết quả cho tất cả các nút đáp án
     document.querySelectorAll('.answer-btn').forEach((btn, idx) => {
-        btn.classList.remove('bg-green-200', 'bg-red-200', 'border-green-400', 'border-red-400');
-        if (idx === selectedIdx) {
-            if (selectedIdx === questions[currentIndex].correctAnswerIndex) {
-                btn.classList.add('bg-green-200', 'border-green-400');
-            } else {
-                btn.classList.add('bg-red-200', 'border-red-400');
-            }
-        }
-        // Highlight đáp án đúng
-        if (idx === questions[currentIndex].correctAnswerIndex) {
-            btn.classList.add('bg-green-100');
-        }
         btn.disabled = true;
+        const isCorrectAnswer = (idx === questions[currentIndex].correctAnswerIndex);
+        const isSelectedAnswer = (idx === selectedIdx);
+
+        // Luôn luôn làm nổi bật đáp án đúng bằng màu xanh
+        if (isCorrectAnswer) {
+            btn.classList.add('bg-green-200', 'border-green-400', 'text-green-800', 'font-bold');
+            // Thêm lớp hover để đảm bảo màu không đổi khi di chuột qua, ghi đè lớp hover mặc định
+            btn.classList.add('hover:bg-green-200', 'hover:border-green-400');
+            // Nếu người dùng chọn đúng, thêm hiệu ứng pulse
+            if (isSelectedAnswer) {
+                btn.classList.add('correct-answer-pulse');
+            }
+        } 
+        // Nếu người dùng chọn sai, làm nổi bật lựa chọn sai bằng màu đỏ và hiệu ứng rung
+        else if (isSelectedAnswer) {
+            btn.classList.add('bg-red-200', 'border-red-400', 'text-red-800');
+            btn.classList.add('wrong-answer-shake');
+            // Thêm lớp hover để đảm bảo màu không đổi khi di chuột qua
+            btn.classList.add('hover:bg-red-200', 'hover:border-red-400');
+        } else {
+            // Với các đáp án còn lại, loại bỏ hiệu ứng hover để tránh gây nhiễu
+            btn.classList.remove('hover:bg-[#FFB6C1]/50', 'hover:border-[#FF69B4]');
+        }
     });
 
     // Hiện giải thích
@@ -872,7 +1017,28 @@ function handleAnswerClick(e) {
 }
 
 // Gắn trình xử lý sự kiện cho các nút
-startNowBtn.addEventListener('click', () => startQuizMode([...originalQuestions], 'normal'));
+startNowBtn.addEventListener('click', () => {
+    // Get options from checkboxes
+    const shouldShuffle = document.getElementById('shuffle-questions-checkbox')?.checked || false;
+    const timedCheckbox = document.getElementById('timed-mode-checkbox');
+    const isTimed = timedCheckbox ? timedCheckbox.checked : true;
+
+    // Update session options
+    quizOptions = { isTimed };
+
+    let questionsToStart = [...originalQuestions]; // Create a copy to avoid modifying the original
+
+    if (shouldShuffle) {
+        // Fisher-Yates shuffle
+        for (let i = questionsToStart.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [questionsToStart[i], questionsToStart[j]] = [questionsToStart[j], questionsToStart[i]];
+        }
+        showToast('Đã xáo trộn câu hỏi!', 'info');
+    }
+    
+    startQuizMode(questionsToStart, 'normal');
+});
 startFlashcardBtn.addEventListener('click', startFlashcardMode);
 
 // Tải dữ liệu bộ đề ngay khi trang được tải

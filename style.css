@@ -1,10 +1,178 @@
 @import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap');
 
 body {
-    font-family: 'Quicksand', sans-serif;
-    /* Màu nền đã được Tailwind xử lý, nhưng giữ lại làm màu cơ bản */
-    background-color: #FCE4EC; 
+    font-family: 'Quicksand', 'Poppins', 'Baloo 2', cursive, sans-serif;
+    background: linear-gradient(135deg, #FCE4EC 0%, #D8BFD8 100%);
+    min-height: 100vh;
+    color: #444;
 }
+
+.cute-bg {
+    background: linear-gradient(120deg, #FCE4EC 60%, #D8BFD8 100%);
+}
+
+.cute-border {
+    border: 2px solid #FFB6C1;
+    border-radius: 20px;
+}
+
+.cute-shadow {
+    box-shadow: 0 4px 24px 0 #FFD6E0, 0 1.5px 6px #D8BFD8;
+}
+
+.cute-card {
+    background: #fff;
+    border-radius: 20px;
+    box-shadow: 0 4px 24px 0 #FFD6E0, 0 1.5px 6px #D8BFD8;
+    padding: 1.5rem;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+.cute-card:hover {
+    box-shadow: 0 8px 32px 0 #FFB6C1, 0 3px 12px #D8BFD8;
+    transform: translateY(-3px) scale(1.01);
+}
+
+.cute-btn {
+    border-radius: 999px;
+    background: linear-gradient(90deg, #FFB6C1 60%, #FFD6E0 100%);
+    color: #fff;
+    font-weight: 600;
+    padding: 0.5rem 1.2rem;
+    font-size: 1rem;
+    box-shadow: 0 2px 8px #FFD6E0;
+    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.cute-btn:hover {
+    background: linear-gradient(90deg, #FF69B4 60%, #FFD6E0 100%);
+    box-shadow: 0 4px 16px #FFB6C1;
+    transform: scale(1.04);
+}
+
+.cute-input, .cute-textarea {
+    border-radius: 12px;
+    border: 1.5px solid #FFD6E0;
+    background: #FFF7FA;
+    padding: 0.7rem 1rem;
+    font-size: 1rem;
+    transition: border 0.2s, box-shadow 0.2s;
+}
+.cute-input:focus, .cute-textarea:focus {
+    border: 2px solid #FF69B4;
+    box-shadow: 0 0 0 2px #FFD6E0;
+    outline: none;
+}
+
+.cute-label {
+    font-weight: 600;
+    color: #FF69B4;
+    margin-bottom: 0.3rem;
+    display: block;
+}
+
+.cute-question-block {
+    background: linear-gradient(120deg, #FFF7FA 80%, #FCE4EC 100%);
+    border: 2px solid #FFD6E0;
+    border-radius: 18px;
+    box-shadow: 0 2px 12px #FFD6E0;
+    margin-bottom: 1.5rem;
+    padding: 1.2rem 1.2rem 1.6rem 1.2rem;
+    position: relative;
+    animation: fadeIn 0.5s;
+}
+.cute-question-block .cute-corner-icon {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    font-size: 1.2rem;
+    color: #FFD6E0;
+    opacity: 0.7;
+}
+
+.cute-add-btn {
+    background: linear-gradient(90deg, #B2F2FF 60%, #FFD6E0 100%);
+    color: #FF69B4;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 1.1rem;
+    box-shadow: 0 2px 8px #B2F2FF44;
+    padding: 0.4rem 1.1rem;
+    transition: background 0.2s, transform 0.1s;
+}
+.cute-add-btn:hover {
+    background: linear-gradient(90deg, #FF69B4 60%, #B2F2FF 100%);
+    color: #fff;
+    transform: scale(1.06);
+}
+
+.cute-remove-btn {
+    background: #FFD6E0;
+    color: #FF69B4;
+    border-radius: 999px;
+    font-weight: 700;
+    font-size: 1rem;
+    padding: 0.3rem 0.9rem;
+    transition: background 0.2s, color 0.2s, transform 0.1s;
+}
+.cute-remove-btn:hover {
+    background: #FF69B4;
+    color: #fff;
+    transform: scale(1.08);
+}
+
+.cute-radio:checked {
+    box-shadow: 0 0 0 3px #FFB6C1;
+    border-color: #FF69B4;
+}
+
+.cute-toast {
+    border-radius: 16px;
+    background: linear-gradient(90deg, #FFF7FA 70%, #FCE4EC 100%);
+    color: #FF69B4;
+    box-shadow: 0 2px 12px #FFD6E0;
+    font-weight: 600;
+    padding: 1rem 1.5rem;
+    margin-bottom: 0.7rem;
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    font-size: 1rem;
+}
+
+.cute-helper {
+    font-size: 0.95rem;
+    color: #B2B2B2;
+    margin-top: 0.2rem;
+    margin-bottom: 0.7rem;
+}
+
+.cute-mascot {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: #FFD6E0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    color: #FF69B4;
+    box-shadow: 0 2px 8px #FFD6E0;
+    margin-bottom: 0.7rem;
+    margin-right: 0.6rem;
+}
+
+.cute-divider {
+    border-top: 2px dashed #FFD6E0;
+    margin: 1.2rem 0;
+}
+
+.cute-fade-in {
+    animation: fadeIn 0.5s ease-out forwards;
+}
+
+/* Giữ lại các class chung cho site phía dưới */
 
 .progress-bar {
     height: 0.75rem;
