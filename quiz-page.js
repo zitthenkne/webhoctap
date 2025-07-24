@@ -94,15 +94,80 @@ document.addEventListener('DOMContentLoaded', () => {
     function loadQuizDetails() {
         const quizTitle = document.getElementById('quiz-title');
         const quizInfo = document.getElementById('quiz-info');
-        const aiSummary = document.getElementById('ai-summary');
-
         if (quizData) {
             quizTitle.textContent = quizData.title;
             quizInfo.textContent = `Bộ đề có ${quizData.questionCount} câu hỏi. Sẵn sàng để chinh phục chưa?`;
-            const topics = (quizData.questions || []).map(q => q.topic || 'Chung');
-            const uniqueTopics = [...new Set(topics)];
-            aiSummary.textContent = `Bộ đề này tập trung vào các chủ đề như: ${uniqueTopics.join(', ')}. Chúc bạn học tốt!`;
         }
+        // Preview logic handled separately
+    }
+
+    // --- Preview Button Logic ---
+    let previewBtn, previewBlock, previewList;
+    function setupPreviewButton() {
+        previewBtn = document.getElementById('show-preview-btn');
+        previewBlock = document.getElementById('quiz-preview');
+        previewList = document.getElementById('quiz-preview-list');
+        const previewContent = document.getElementById('quiz-preview-content');
+        const collapseBtn = document.getElementById('collapse-preview-btn');
+        if (previewBtn && previewBlock && previewList && previewContent && collapseBtn) {
+            previewBtn.addEventListener('click', () => {
+                if (!quizData || !quizData.questions || quizData.questions.length === 0) {
+                    previewList.innerHTML = '<li class="quiz-preview-empty">Không có câu hỏi để xem trước.</li>';
+                    previewBlock.classList.remove('hidden');
+                    previewContent.classList.remove('collapsed');
+                    collapseBtn.querySelector('i').classList.remove('fa-rotate-180');
+                    return;
+                }
+                // Randomly pick 5 questions
+                let questions = [...quizData.questions];
+                for (let i = questions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [questions[i], questions[j]] = [questions[j], questions[i]];
+                }
+                const picked = questions.slice(0, 5);
+                previewList.innerHTML = '';
+                picked.forEach((q) => {
+                    let text = q.text || q.question || '';
+                    if (text.length > 80) text = text.substring(0, 80) + '...';
+                    let answers = q.answers || q.choices || q.options || [];
+                    let answersHtml = '';
+                    if (Array.isArray(answers) && answers.length > 0) {
+                        // Render answers in 2 columns (CSS grid)
+                        let answerItems = answers.map(a => `<li class='preview-answer-item'>${a}</li>`).join('');
+                        answersHtml = `<ul class='preview-answers preview-answers-2col'>${answerItems}</ul>`;
+                    } else {
+                        answersHtml = '<div class="preview-no-answers">(Không có đáp án trắc nghiệm)</div>';
+                    }
+                    previewList.innerHTML += `<li><span class='preview-question-text'>${text}</span>${answersHtml}</li>`;
+                });
+                previewBlock.classList.remove('hidden');
+                previewContent.classList.remove('collapsed');
+                collapseBtn.querySelector('i').classList.remove('fa-rotate-180');
+            });
+            collapseBtn.addEventListener('click', () => {
+                previewContent.classList.toggle('collapsed');
+                collapseBtn.querySelector('i').classList.toggle('fa-rotate-180');
+            });
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        setupPreviewButton();
+        // ... (giữ nguyên các logic khác trong DOMContentLoaded)
+        // Tải dữ liệu bộ đề ngay khi trang được tải
+        loadQuizData();
+    });
+
+    // Sau khi loadQuizData xong và quizData đã có, gọi lại setupPreviewButton để đảm bảo quizData đã sẵn sàng
+    function loadQuizDetails() {
+        const quizTitle = document.getElementById('quiz-title');
+        const quizInfo = document.getElementById('quiz-info');
+        if (quizData) {
+            quizTitle.textContent = quizData.title;
+            quizInfo.textContent = `Bộ đề có ${quizData.questionCount} câu hỏi. Sẵn sàng để chinh phục chưa?`;
+        }
+        setupPreviewButton();
+        // Preview logic handled separately
     }
 
     // === LOGIC FLASHCARD (NÂNG CẤP MỚI) ===
@@ -612,10 +677,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h2 class="text-xl font-bold text-gray-700">${title}</h2>
                 <div id="timer" class="text-lg font-semibold text-[#FF69B4] ${quizOptions.isTimed ? '' : 'hidden'}">00:00</div>
             </div>
-            <div class="mb-2 flex items-center gap-2">
+            <div class="mb-2 flex flex-wrap items-center gap-2">
                 <span class="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold border border-blue-200">
                     <i class="fas fa-tag mr-1"></i> Chủ đề: ${question.topic ? question.topic : 'Chung'}
                 </span>
+                ${question.level && question.level.trim() ? `<span class="inline-block px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold border border-purple-200"><i class="fas fa-layer-group mr-1"></i> Mức độ: ${question.level}</span>` : ''}
+                ${question.source && question.source.trim() ? `<span class="inline-block px-3 py-1 rounded-full bg-pink-100 text-pink-700 text-xs font-semibold border border-pink-200"><i class="fas fa-book mr-1"></i> Nguồn: ${question.source}</span>` : ''}
             </div>
             <h3 class="text-2xl font-semibold text-gray-800 my-6 text-center">${question.question}</h3>
             <div id="answers-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -634,8 +701,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 </button>
             </div>
             <div id="explanation-area" class="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded hidden">
-                <h4 class="font-bold text-yellow-800 text-lg">Giải thích</h4>
+                <h4 class="font-bold text-yellow-800 text-lg flex items-center gap-2"><i class="fas fa-lightbulb"></i> Giải thích</h4>
                 <p class="text-yellow-700 mt-1 text-base">${question.explanation || 'Không có giải thích.'}</p>
+                ${question.note && question.note.trim() ? `<div class="mt-3 flex items-start gap-2"><i class="fas fa-sticky-note text-pink-400 mt-1"></i><span class="text-pink-700 text-base"><span class="font-semibold">Ghi chú:</span> ${question.note}</span></div>` : ''}
             </div>
             <div class="mt-8 flex justify-between">
                 <button id="prevBtn" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition ${currentIndex === 0 || quizMode === 'practice' ? 'invisible' : ''}">

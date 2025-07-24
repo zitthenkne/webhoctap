@@ -108,6 +108,28 @@ async function handleLogin() { const email = document.getElementById('emailInput
 async function handleSignup() { const email = document.getElementById('emailInput').value; const password = document.getElementById('passwordInput').value; if (!email || !password) return showToast('Vui lòng nhập đủ thông tin.', 'warning'); try { const userCredential = await createUserWithEmailAndPassword(auth, email, password); const user = userCredential.user; await setDoc(doc(db, "users", user.uid), { email: user.email, createdAt: new Date(), quizSetsCreated: 0 }); showToast('Đăng ký thành công!', 'success'); toggleAuthModal(); } catch (error) { showToast('Đăng ký thất bại: ' + error.message, 'error'); } }
 async function handleFileSelect(e) { const file = e.target.files[0]; if (!file) return; fileNameElem.textContent = file.name; questionCountInfo.textContent = 'Đang phân tích...'; fileInfo.classList.remove('hidden'); processBtn.classList.add('hidden'); saveBtnPreQuiz.classList.add('hidden'); try { const parsedQuestions = await parseFile(file); if (parsedQuestions.length === 0) { questionCountInfo.textContent = 'Lỗi: Không tìm thấy câu hỏi.'; return; } const topics = parsedQuestions.map(q => q.topic); const uniqueTopics = new Set(topics); questions = parsedQuestions; currentQuizTitle = file.name.replace(/\.(xlsx|xls|csv)$/, ''); questionCountInfo.textContent = `✓ Tìm thấy ${questions.length} câu hỏi / ${uniqueTopics.size} chủ đề.`; processBtn.classList.remove('hidden'); saveBtnPreQuiz.classList.remove('hidden'); saveBtnPreQuiz.disabled = false; saveBtnPreQuiz.innerHTML = '<i class="fas fa-save mr-2"></i> Lưu vào thư viện'; } catch (error) { questionCountInfo.textContent = 'Lỗi! Không thể đọc file.'; console.error("Lỗi phân tích file:", error); } }
 function parseFile(file) {
+    // Các tên cột tương đương cho từng trường
+    const COLUMN_ALIASES = {
+        question: ['question', 'câu hỏi', 'nội dung câu hỏi', 'câu hỏi trắc nghiệm', 'nội dung', 'question content', 'question text'],
+        option1: ['option1', 'phương án 1', 'đáp án 1', 'lựa chọn 1', 'a', 'answer1', 'option a', 'A'],
+        option2: ['option2', 'phương án 2', 'đáp án 2', 'lựa chọn 2', 'b', 'answer2', 'option b', 'B'],
+        option3: ['option3', 'phương án 3', 'đáp án 3', 'lựa chọn 3', 'c', 'answer3', 'option c', 'C'],
+        option4: ['option4', 'phương án 4', 'đáp án 4', 'lựa chọn 4', 'd', 'answer4', 'option d', 'D'],
+        correct: ['correct', 'đáp án đúng', 'đáp án', 'answer', 'đúng', 'correctanswer', 'đáp án số', 'correct answer'],
+        topic: ['topic', 'chủ đề', 'môn học', 'phân loại', 'subject', 'category'],
+        explanation: ['explanation', 'giải thích', 'lý giải', 'giải nghĩa', 'explain', 'giải thích đáp án'],
+        source: ['source', 'nguồn', 'tài liệu', 'reference', 'nguon'],
+        level: ['level', 'mức độ', 'độ khó', 'difficulty', 'độ khó khăn', 'muc do'],
+        note: ['note', 'ghi chú', 'ghi chu', 'chú thích', 'comment', 'remark']
+    };
+    // Hàm tìm index cột theo alias
+    function findColumnIdx(headers, aliases) {
+        // So sánh tên cột đã chuẩn hóa (trim, toLowerCase)
+        return headers.findIndex(h => {
+            const norm = (h || '').toString().trim().toLowerCase();
+            return aliases.some(alias => norm === alias.trim().toLowerCase());
+        });
+    }
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = function(e) {
@@ -116,27 +138,50 @@ function parseFile(file) {
                 const workbook = XLSX.read(data, { type: 'array' });
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+                if (!jsonData || jsonData.length < 2) return resolve([]);
+                const headers = jsonData[0].map(h => (h || '').toString().trim().toLowerCase());
+                // Ánh xạ trường logic -> index cột
+                const colIdx = {};
+                for (const key in COLUMN_ALIASES) {
+                    colIdx[key] = findColumnIdx(headers, COLUMN_ALIASES[key]);
+                }
                 const parsedQuestions = jsonData.slice(1).map(row => {
-                    // Bỏ qua các hàng trống
-                    if (!row || !row[0] || String(row[0]).trim() === '') return null;
-                    
-                    // Lấy giá trị đáp án đúng (1, 2, 3, 4) từ file Excel
-                    const correctAnswerValue = parseInt(row[5], 10);
-
+                    const questionIdx = colIdx['question'];
+                    if (!row || questionIdx === undefined || !row[questionIdx] || String(row[questionIdx]).trim() === '') return null;
+                    const option1Idx = colIdx['option1'];
+                    const option2Idx = colIdx['option2'];
+                    const option3Idx = colIdx['option3'];
+                    const option4Idx = colIdx['option4'];
+                    const correctIdx = colIdx['correct'];
+                    const topicIdx = colIdx['topic'];
+                    const explanationIdx = colIdx['explanation'];
+                    let correctAnswerIndex = null;
+                    if (correctIdx !== undefined && row[correctIdx] != null) {
+                        let val = row[correctIdx].toString().trim();
+                        // Nếu là số 1-4
+                        if (/^[1-4]$/.test(val)) {
+                            correctAnswerIndex = parseInt(val, 10) - 1;
+                        } else if (/^[a-dA-D]$/.test(val)) {
+                            // Nếu là A/B/C/D (không phân biệt hoa thường)
+                            correctAnswerIndex = val.toUpperCase().charCodeAt(0) - 65; // 'A'->0, 'B'->1, ...
+                        }
+                    }
+                    const sourceIdx = colIdx['source'];
+                    const levelIdx = colIdx['level'];
+                    const noteIdx = colIdx['note'];
                     return {
-                        question: row[0],
-                        // SỬA LỖI 1: Đổi 'options' trở lại thành 'answers' để trang quiz có thể đọc.
-                        answers: [row[1], row[2], row[3], row[4]].filter(ans => ans != null && String(ans).trim() !== ''),
-                        
-                        // SỬA LỖI 2: Chuyển đổi đáp án đúng (1,2,3,4) thành chỉ số (index) 0,1,2,3 để logic kiểm tra hoạt động chính xác.
-                        correctAnswerIndex: (!isNaN(correctAnswerValue) && correctAnswerValue >= 1 && correctAnswerValue <= 4) ? correctAnswerValue - 1 : null,
-                        
-                        // SỬA LỖI 3: Đổi 'explain' trở lại thành 'explanation' để trang quiz có thể hiển thị giải thích.
-                        explanation: row[7] || '', 
-                        
-                        topic: row[6] || 'Chung' // Giữ lại thuộc tính topic để hiển thị thông tin
+                        question: row[questionIdx],
+                        answers: [option1Idx, option2Idx, option3Idx, option4Idx]
+                            .map(idx => idx !== undefined ? row[idx] : undefined)
+                            .filter(ans => ans != null && String(ans).trim() !== ''),
+                        correctAnswerIndex: correctAnswerIndex,
+                        explanation: explanationIdx !== undefined ? (row[explanationIdx] || '') : '',
+                        topic: topicIdx !== undefined ? (row[topicIdx] || 'Chung') : 'Chung',
+                        source: sourceIdx !== undefined ? (row[sourceIdx] || '') : '',
+                        level: levelIdx !== undefined ? (row[levelIdx] || '') : '',
+                        note: noteIdx !== undefined ? (row[noteIdx] || '') : ''
                     };
-                }).filter(q => q !== null); // Lọc bỏ các câu hỏi rỗng
+                }).filter(q => q !== null);
                 resolve(parsedQuestions);
             } catch (error) {
                 reject(error);
@@ -353,7 +398,59 @@ async function editQuizSetTitle(quizId, currentTitle) {
     }
 }
 
-function downloadTemplate() { const sampleData = [ ['Nội dung câu hỏi', 'Đáp án 1', 'Đáp án 2', 'Đáp án 3', 'Đáp án 4', 'Đáp án đúng (Điền số 1,2,3,4)', 'Chủ đề', 'Giải thích'], ['Thủ đô của Việt Nam là gì?', 'TP. Hồ Chí Minh', 'Đà Nẵng', 'Hà Nội', 'Hải Phòng', 3, 'Địa lý', 'Hà Nội là thủ đô của nước CHXHCN Việt Nam.'] ]; const worksheet = XLSX.utils.aoa_to_sheet(sampleData); const workbook = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(workbook, worksheet, "Zitthenkne Mau"); worksheet['!cols'] = [ {wch: 50}, {wch: 25}, {wch: 25}, {wch: 25}, {wch: 25}, {wch: 30}, {wch: 25}, {wch: 50} ]; XLSX.writeFile(workbook, "Zitthenkne_File_Mau.xlsx"); }
+function downloadTemplate() { const sampleData = [
+  [
+    '★ Nội dung câu hỏi', // BẮT BUỘC - hoặc: question, câu hỏi, nội dung câu hỏi
+    '★ Đáp án 1', // BẮT BUỘC - hoặc: option1, A, phương án 1
+    '★ Đáp án 2', // BẮT BUỘC
+    'Đáp án 3',
+    'Đáp án 4',
+    '★ Đáp án đúng (1,2,3,4 hoặc A,B,C,D)', // BẮT BUỘC - hoặc: correct, đáp án đúng
+    'Chủ đề', // hoặc: topic, chủ đề
+    'Giải thích', // hoặc: explanation, giải thích
+    'Nguồn (Source)', // hoặc: source, nguồn, tài liệu
+    'Mức độ (Level)', // hoặc: level, mức độ, độ khó
+    'Ghi chú (Note)' // hoặc: note, ghi chú, comment
+  ],
+  [
+    'Lưu ý: Các cột có dấu ★ là bắt buộc phải nhập. Các cột còn lại có thể bỏ trống.', '', '', '', '', '', '', '', '', '', ''
+  ],
+  [
+    'Thủ đô của Việt Nam là gì?',
+    'TP. Hồ Chí Minh',
+    'Đà Nẵng',
+    'Hà Nội',
+    'Hải Phòng',
+    '3', // hoặc 'C'
+    'Địa lý',
+    'Hà Nội là thủ đô của nước CHXHCN Việt Nam.',
+    'SGK Địa lý 4',
+    'Nhận biết',
+    'Câu hỏi cơ bản'
+  ],
+  [
+    'Vitamin nào tan trong nước?',
+    'A',
+    'B',
+    'D',
+    'K',
+    '2', // hoặc 'B'
+    'Sinh học',
+    'Vitamin nhóm B tan trong nước, A/D/K tan trong dầu.',
+    'Sách Sinh học nâng cao',
+    'Vận dụng',
+    'Có thể gây nhầm lẫn cho học sinh'
+  ]
+];
+const worksheet = XLSX.utils.aoa_to_sheet(sampleData);
+const workbook = XLSX.utils.book_new();
+XLSX.utils.book_append_sheet(workbook, worksheet, "Zitthenkne Mau");
+worksheet['!cols'] = [
+  {wch: 50}, {wch: 25}, {wch: 25}, {wch: 25}, {wch: 25},
+  {wch: 30}, {wch: 25}, {wch: 50}, {wch: 30}, {wch: 20}, {wch: 30}
+];
+XLSX.writeFile(workbook, "File mẫu nè.xlsx");
+}
 // HÀM calculateGPA - PHIÊN BẢN HOÀN CHỈNH
 // HÀM calculateGPA - PHIÊN BẢN CẬP NHẬT THEO CÔNG THỨC MỚI
 function calculateGPA() {

@@ -70,6 +70,7 @@
             animation: shake-animation 0.82s cubic-bezier(.36,.07,.19,.97) both;
         }
     </style>
+    <link rel="stylesheet" href="quiz-preview.css">
 </head>
 <body class="bg-[#FCE4EC] flex items-center justify-center min-h-screen p-2 sm:p-4 text-sm">
     <!-- Mobile Top Bar with Hamburger -->
@@ -92,11 +93,23 @@
         <div id="quiz-landing" class="bg-white rounded-lg shadow-2xl p-4 sm:p-8 text-center fade-in">
             <h1 id="quiz-title" class="text-2xl sm:text-3xl font-bold text-[#FF69B4] mb-2">Đang tải thông tin...</h1>
             <p id="quiz-info" class="text-gray-600 mb-4 sm:mb-6">Hãy sẵn sàng cho cuộc phiêu lưu tri thức!</p>
-            <div class="bg-pink-50 p-3 sm:p-6 rounded-lg text-left">
-                <h3 class="text-base sm:text-lg font-semibold text-gray-700 mb-2 sm:mb-3 flex items-center">
-                    <i class="fas fa-robot text-[#FF69B4] mr-2"></i> Trợ lý AI tóm tắt:
-                </h3>
-                <p id="ai-summary" class="text-gray-600 italic">AI đang phân tích nội dung...</p>
+
+            <button id="show-preview-btn" class="mb-4 px-4 py-2 bg-pink-500 text-white rounded-lg shadow hover:bg-pink-600 transition flex items-center gap-2 mx-auto">
+                <i class="fas fa-eye"></i> Xem trước một số câu hỏi
+            </button>
+            <div id="quiz-preview" class="quiz-preview-container mb-8 hidden">
+                <div class="flex items-center justify-between mb-2">
+                  <div class="quiz-preview-title flex items-center gap-2">
+                    <i class="fas fa-eye text-[#FF69B4]"></i>
+                    Xem trước một số câu hỏi
+                  </div>
+                  <button id="collapse-preview-btn" class="text-pink-400 hover:text-pink-600 bg-white border border-pink-200 rounded-full w-8 h-8 flex items-center justify-center shadow transition" title="Thu gọn"><i class="fas fa-chevron-up"></i></button>
+                </div>
+                <div id="quiz-preview-content">
+                  <ul class="quiz-preview-list space-y-4" id="quiz-preview-list">
+                    <li class="quiz-preview-empty">Đang tải trước câu hỏi...</li>
+                  </ul>
+                </div>
             </div>
             <div class="mt-6 border-t border-pink-100 pt-6 max-w-md mx-auto">
                 <h3 class="text-lg font-semibold text-gray-700 mb-3 text-center">Tùy chọn</h3>
