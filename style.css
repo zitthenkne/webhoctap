@@ -172,6 +172,20 @@ body {
     animation: fadeIn 0.5s ease-out forwards;
 }
 
+/* Hiệu ứng hover đáp án quiz */
+.answer-btn.bg-green-200:hover, .answer-btn.border-green-500:hover {
+  background: #bbf7d0 !important; /* bg-green-200 */
+  border-color: #22c55e !important; /* border-green-500 */
+}
+.answer-btn.bg-red-200:hover, .answer-btn.border-red-500:hover {
+  background: #fecaca !important; /* bg-red-200 */
+  border-color: #ef4444 !important; /* border-red-500 */
+}
+.answer-btn:hover {
+  background: #DBEAFE !important; /* bg-blue-100 */
+  border-color: #60A5FA !important; /* border-blue-400 */
+}
+
 /* Giữ lại các class chung cho site phía dưới */
 
 .progress-bar {
