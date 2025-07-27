@@ -43,6 +43,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const startFlashcardBtn = document.getElementById('start-flashcard-btn');
     const submitQuizBtn = document.getElementById('submit-quiz-btn');
 
+    // Thêm xử lý nút xem trước câu hỏi
+    const showPreviewBtn = document.getElementById('show-preview-btn');
+    const quizPreview = document.getElementById('quiz-preview');
+    if (showPreviewBtn && quizPreview) {
+        showPreviewBtn.addEventListener('click', () => {
+            quizPreview.classList.toggle('hidden');
+        });
+    }
+
     // === BIẾN TRẠNG THÁI ===
     let quizData = null;          // Dữ liệu bộ đề từ Firestore
     let questions = [];           // Các câu hỏi cho phiên làm bài hiện tại
@@ -143,7 +152,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (quizTimerInterval) clearInterval(quizTimerInterval);
         if (quizOptions.isTimed) {
-            startTimer();
+            // Lấy số phút từ quizOptions, chuyển sang giây
+            let totalSeconds = 0;
+            if (quizOptions.timedMinutes && !isNaN(quizOptions.timedMinutes)) {
+                totalSeconds = quizOptions.timedMinutes * 60;
+            }
+            startTimer(totalSeconds);
         }
 
         quizLanding.classList.add('hidden');
@@ -247,7 +261,7 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="bg-white rounded-lg shadow-lg p-6 fade-in">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="text-xl font-bold text-gray-700">${title}</h2>
-                <div id="timer" class="text-lg font-semibold text-[#FF69B4] ${quizOptions.isTimed ? '' : 'hidden'}">00:00</div>
+                
             </div>
             <div class="mb-2 flex flex-wrap items-center gap-2">
                 <span class="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold border border-blue-200">
@@ -690,66 +704,37 @@ function handleAnswerClick(e) {
 
 // Gắn trình xử lý sự kiện cho các nút
 startNowBtn.addEventListener('click', () => {
+    // Lấy tùy chọn số câu hỏi nếu có
+    const enableCountCheckbox = document.getElementById('enable-question-count-checkbox');
+    const countInput = document.getElementById('question-count-input');
+    let selectedQuestions = [...originalQuestions];
+    if (enableCountCheckbox && enableCountCheckbox.checked && countInput) {
+        let n = parseInt(countInput.value);
+        n = Math.max(1, Math.min(n, originalQuestions.length));
+        // Random n câu hỏi
+        selectedQuestions = shuffleArray([...originalQuestions]).slice(0, n);
+    }
+    // Lấy tùy chọn timer
+    const timedCheckbox = document.getElementById('timed-mode-checkbox');
+    const timedInput = document.getElementById('timed-minutes-input');
+    quizOptions.isTimed = timedCheckbox && timedCheckbox.checked;
+    quizOptions.timedMinutes = timedInput ? parseInt(timedInput.value) : 0;
+    // Lấy tùy chọn hiện đáp án ngay
+    const showAnswerCheckbox = document.getElementById('show-answer-immediately-checkbox');
+    quizOptions.showAnswerImmediately = showAnswerCheckbox && showAnswerCheckbox.checked;
     showSubmitQuizBtn(true); // Hiện nút nộp bài khi bắt đầu
-    
-    // Get options from checkboxes
-    const shouldShuffle = document.getElementById('shuffle-questions-checkbox')?.checked || false;
-    const showAnswerImmediately = document.getElementById('show-answer-immediately-checkbox')?.checked ?? true;
-
-    const isTimed = document.getElementById('timed-mode-checkbox')?.checked || false;
-    let timedMinutes = 30;
-    if (isTimed) {
-        const minutesInput = document.getElementById('timed-minutes-input');
-        if (minutesInput && minutesInput.value) {
-            timedMinutes = Math.max(1, Math.min(180, parseInt(minutesInput.value, 10)));
-        }
-    }
-    quizOptions = { isTimed, timedMinutes };
-    startQuizMode([...originalQuestions], 'normal');
-
-    let questionsToStart = [...originalQuestions]; // Create a copy to avoid modifying the original
-
-    if (shouldShuffle) {
-        // Fisher-Yates shuffle
-        for (let i = questionsToStart.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [questionsToStart[i], questionsToStart[j]] = [questionsToStart[j], questionsToStart[i]];
-        }
-        showToast('Đã xáo trộn câu hỏi!', 'info');
-    }
-
-    // Nếu chọn xáo trộn đáp án: tạo thứ tự ngẫu nhiên cho từng câu và lưu lại
-    const shuffleAnswers = false; // Nếu muốn bật, hãy thay đổi thành true hoặc lấy từ checkbox
-    if (shuffleAnswers) {
-        questionsToStart.forEach(q => {
-            let answerOptions = q.answers || q.options;
-            if (!answerOptions || !Array.isArray(answerOptions)) return;
-            let order = answerOptions.map((_, idx) => idx);
-            // Fisher-Yates shuffle
-            for (let i = order.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [order[i], order[j]] = [order[j], order[i]];
-            }
-            q._displayedAnswerOrder = order;
-            // Xác định lại chỉ số đáp án đúng mới
-            let correctAnswerIndex = (typeof q.correctAnswerIndex === 'number') ? q.correctAnswerIndex : 0;
-            q._displayedCorrectIndex = order.findIndex(idx => idx === correctAnswerIndex);
-        });
-    } else {
-        // Nếu không xáo trộn đáp án thì dùng thứ tự gốc
-        questionsToStart.forEach(q => {
-            let answerOptions = q.answers || q.options;
-            if (!answerOptions || !Array.isArray(answerOptions)) return;
-            let order = answerOptions.map((_, idx) => idx);
-            q._displayedAnswerOrder = order;
-            let correctAnswerIndex = (typeof q.correctAnswerIndex === 'number') ? q.correctAnswerIndex : 0;
-            q._displayedCorrectIndex = correctAnswerIndex;
-        });
-    }
-
-    quizOptions.showAnswerImmediately = showAnswerImmediately;
-    startQuizMode(questionsToStart, 'normal', null);
+    startQuizMode(selectedQuestions, 'normal');
 });
+
+// Hàm random hoán vị mảng (Fisher-Yates)
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+    return array;
+}
+
 if (startFlashcardBtn) {
     startFlashcardBtn.addEventListener('click', startFlashcardMode);
 }
