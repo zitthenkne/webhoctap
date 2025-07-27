@@ -442,6 +442,12 @@ function showNextQuestion() {
 function showResults(totalTime) {
     resultsSection.classList.remove('hidden');
     const percentage = questions.length > 0 ? ((score / questions.length) * 100).toFixed(1) : 0;
+    // --- TÍNH ĐIỂM HỆ 4 ---
+    const gpaResult = convertScoreToGPA(score, questions.length);
+    const gpa4 = gpaResult.score4;
+    const letterGrade = gpaResult.letterGrade;
+    const motivation = gpaResult.motivation;
+    const score10 = gpaResult.score10; // Nếu muốn hiển thị luôn hệ 10
     const showPracticeButton = score < questions.length;
     const unansweredList = questions.map((q, i) => userAnswers[i] === null ? i+1 : null).filter(x => x !== null);
     const markedList = markedQuestions.map(i => i+1);
@@ -504,6 +510,21 @@ function showResults(totalTime) {
                     ${percentage}%
                 </p>
                 <p class="text-lg text-gray-700 mt-2">Đúng ${score}/${questions.length} câu</p>
+                <div class="flex flex-wrap justify-center gap-4 mt-4">
+                  <div class="bg-white/80 px-6 py-3 rounded-xl shadow text-center">
+                    <div class="text-gray-600 text-sm font-medium">Điểm hệ 4</div>
+                    <div class="text-3xl font-bold text-blue-500">${gpa4}</div>
+                  </div>
+                  <div class="bg-white/80 px-6 py-3 rounded-xl shadow text-center">
+                    <div class="text-gray-600 text-sm font-medium">Điểm chữ</div>
+                    <div class="text-2xl font-bold text-pink-500">${letterGrade}</div>
+                  </div>
+                  <div class="bg-white/80 px-6 py-3 rounded-xl shadow text-center">
+                    <div class="text-gray-600 text-sm font-medium">Điểm hệ 10</div>
+                    <div class="text-2xl font-bold text-green-500">${score10}</div>
+                  </div>
+                </div>
+                <div class="mt-3 text-pink-700 font-semibold text-base">${motivation}</div>
                 <p class="text-sm text-gray-500 mt-1">Bạn đã trả lời ${questions.length - userAnswers.filter(a => a === null).length} / ${questions.length} câu</p>
             </div>
             <div class="text-md text-gray-500">
@@ -592,6 +613,81 @@ function startTimer(totalSeconds) {
 }
 
 // === CÁC HÀM TIỆN ÍCH ===
+
+/**
+ * Chuyển đổi số câu đúng và tổng số câu thành điểm hệ 10, hệ 4, điểm chữ và thông điệp động lực.
+ * @param {number} correct - Số câu đúng
+ * @param {number} total - Tổng số câu
+ * @returns {object} { score10, score4, letterGrade, motivation }
+ */
+function convertScoreToGPA(correct, total) {
+    if (isNaN(correct) || isNaN(total) || total <= 0 || correct < 0 || correct > total) {
+        return {
+            score10: 0,
+            score4: 0,
+            letterGrade: 'F',
+            motivation: 'Dữ liệu không hợp lệ.'
+        };
+    }
+    const n = correct / total;
+    let score10;
+    if (n < 0.5) {
+        score10 = (8 * correct) / total;
+    } else if (n === 0.5) {
+        score10 = 4.0;
+    } else if (n > 0.5 && n < 0.6) {
+        score10 = 4 + (10 * (correct - 0.5 * total)) / total;
+    } else if (n === 0.6) {
+        score10 = 5.0;
+    } else { // n > 0.6
+        score10 = 5 + (12.5 * (correct - 0.6 * total)) / total;
+    }
+    let score4, letterGrade, motivation;
+    if (score10 >= 9.5) {
+        score4 = 4.0;
+        letterGrade = 'A+';
+        motivation = "Ối dồi ôi, trình là j mà là trình ai chấm!!! Anh chỉ biết làm ba mẹ anh tự hào, xây căn nhà thật to ở 1 mình 2 tấm";
+    } else if (score10 >= 8.5) {
+        score4 = 4.0;
+        letterGrade = 'A';
+        motivation = "Dỏi dữ dị bà, trộm vía trộm víaaaaaa, xin vía 4.0 <3";
+    } else if (score10 >= 8.0) {
+        score4 = 3.5;
+        letterGrade = 'B+';
+        motivation = "gút chóp bây bề";
+    } else if (score10 >= 7.0) {
+        score4 = 3.0;
+        letterGrade = 'B';
+        motivation = "Quaooooooo, vá là dỏi òiiiiii";
+    } else if (score10 >= 6.5) {
+        score4 = 2.5;
+        letterGrade = 'C+';
+        motivation = "Điểm này là cũng cũng ròi á mom, u so gud babi";
+    } else if (score10 >= 5.5) {
+        score4 = 2.0;
+        letterGrade = 'C';
+        motivation = "Cũn cũn ik, cố gắng lên nhennn";
+    } else if (score10 >= 5.0) {
+        score4 = 1.5;
+        letterGrade = 'D+';
+        motivation = "Vừa đủ qua. Cần xem lại kiến thức một chút.";
+    } else if (score10 >= 4.0) {
+        score4 = 1.0;
+        letterGrade = 'D';
+        motivation = "Qua môn rồi! Chúc mừng nha bàaaaa";
+    } else {
+        score4 = 0.0;
+        letterGrade = 'F';
+        motivation = "Hoi mò hoi mò, lần sau sẽ tốt hơn mà!";
+    }
+    return {
+        score10: Number(score10.toFixed(2)),
+        score4: Number(score4.toFixed(1)),
+        letterGrade,
+        motivation
+    };
+}
+
 
 async function saveQuizResult(finalScore, totalQuestions, percentage, timeTaken) {
     const user = auth.currentUser;
