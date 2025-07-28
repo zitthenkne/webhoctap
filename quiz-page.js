@@ -800,15 +800,11 @@ function handleAnswerClick(e) {
 
 // Gắn trình xử lý sự kiện cho các nút
 startNowBtn.addEventListener('click', () => {
-    // Lấy tùy chọn số câu hỏi nếu có
-    const enableCountCheckbox = document.getElementById('enable-question-count-checkbox');
-    const countInput = document.getElementById('question-count-input');
+    // Lấy tùy chọn xáo trộn câu hỏi
+    const shuffleCheckbox = document.getElementById('shuffle-questions-checkbox');
     let selectedQuestions = [...originalQuestions];
-    if (enableCountCheckbox && enableCountCheckbox.checked && countInput) {
-        let n = parseInt(countInput.value);
-        n = Math.max(1, Math.min(n, originalQuestions.length));
-        // Random n câu hỏi
-        selectedQuestions = shuffleArray([...originalQuestions]).slice(0, n);
+    if (shuffleCheckbox && shuffleCheckbox.checked) {
+        selectedQuestions = shuffleArray([...originalQuestions]);
     }
     // Lấy tùy chọn timer
     const timedCheckbox = document.getElementById('timed-mode-checkbox');
