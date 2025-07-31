@@ -223,7 +223,11 @@ document.addEventListener('DOMContentLoaded', updateTimedInputVisibility);
                 <div id="quiz-progress-fill" class="h-full bg-[#FF69B4] rounded-full transition-all duration-300" style="width: 0%;"></div>
             </div>
             <div id="quizSection"></div>
-            <div id="resultsSection" class="hidden"></div>
+            <div id="resultsSection" class="hidden">
+    <button id="retry-wrong-btn" class="mt-6 px-6 py-3 bg-yellow-400 text-white rounded-lg hover:bg-yellow-500 transition-transform transform hover:scale-105 shadow-lg text-lg font-bold hidden">
+        <i class="fas fa-redo-alt mr-2"></i> Làm lại câu sai
+    </button>
+</div>
                 <div class="flex flex-row justify-end mt-4">
   <button id="submit-quiz-btn" class="px-6 py-3 bg-[#FF69B4] text-white rounded-lg hover:bg-pink-600 transition-transform transform hover:scale-105 shadow-lg text-lg font-bold hidden">Nộp bài</button>
 </div>

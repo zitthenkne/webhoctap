@@ -127,6 +127,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
     function startQuizMode(questionsArray, mode = 'normal', restoreState = null) {
+    // Show submit button for both normal and practice mode
+    if (mode === 'normal' || mode === 'practice') {
+        showSubmitQuizBtn(true);
+    } else {
+        showSubmitQuizBtn(false);
+    }
         quizMode = mode;
         questions = questionsArray;
 
@@ -440,6 +446,21 @@ function showNextQuestion() {
 
 // Hiển thị danh sách các câu đã đánh dấu/câu chưa trả lời ở cuối bài
 function showResults(totalTime) {
+    // Show 'retry wrong answers' button if there are any incorrect answers
+    const retryWrongBtn = document.getElementById('retry-wrong-btn');
+    if (retryWrongBtn) {
+        // Count incorrect answers
+        const incorrectCount = questions.reduce((count, q, idx) => {
+            if (userAnswers[idx] !== q.correctAnswerIndex) count++;
+            return count;
+        }, 0);
+        if (incorrectCount > 0) {
+            retryWrongBtn.classList.remove('hidden');
+            retryWrongBtn.onclick = startIncorrectPracticeMode;
+        } else {
+            retryWrongBtn.classList.add('hidden');
+        }
+    }
     resultsSection.classList.remove('hidden');
     const percentage = questions.length > 0 ? ((score / questions.length) * 100).toFixed(1) : 0;
     // --- TÍNH ĐIỂM HỆ 4 ---
