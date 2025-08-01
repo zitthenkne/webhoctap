@@ -219,10 +219,13 @@ document.addEventListener('DOMContentLoaded', updateTimedInputVisibility);
 
         <div id="quiz-container" class="hidden">
     <div id="timerDisplay" class="hidden text-2xl font-bold text-red-500 text-center mb-4"></div>
-            <div class="progress-bar mb-2 sm:mb-4">
-                <div id="quiz-progress-fill" class="h-full bg-[#FF69B4] rounded-full transition-all duration-300" style="width: 0%;"></div>
-            </div>
-            <div id="quizSection"></div>
+    <button id="toggle-nav-btn" type="button" class="mb-2 px-4 py-2 bg-blue-100 text-blue-700 rounded-lg shadow hover:bg-blue-200 transition flex items-center gap-2">
+        <i class="fas fa-eye-slash"></i> Ẩn/Hiện số câu hỏi
+    </button>
+    <div class="progress-bar mb-2 sm:mb-4">
+        <div id="quiz-progress-fill" class="h-full bg-[#FF69B4] rounded-full transition-all duration-300" style="width: 0%;"></div>
+    </div>
+    <div id="quizSection"></div>
             <div id="resultsSection" class="hidden">
     <button id="retry-wrong-btn" class="mt-6 px-6 py-3 bg-yellow-400 text-white rounded-lg hover:bg-yellow-500 transition-transform transform hover:scale-105 shadow-lg text-lg font-bold hidden">
         <i class="fas fa-redo-alt mr-2"></i> Làm lại câu sai

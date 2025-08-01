@@ -198,7 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span>Đã trả lời: ${answeredCount}/${total}</span>
                     <span>Còn lại: ${total - answeredCount}</span>
                 </div>
-                <div class="flex flex-wrap justify-center">${navHtml}</div>
+                <div id="question-nav-wrapper" class="flex flex-wrap justify-center">${navHtml}</div>
             </div>
         `;
     }
@@ -219,6 +219,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function clearQuizState() {
         localStorage.removeItem('quizState');
+    }
+
+    // --- Toggle Navigation State ---
+    let navVisible = true;
+
+    function setNavVisibility(visible) {
+        const navWrapper = document.getElementById('question-nav-wrapper');
+        if (navWrapper) {
+            navWrapper.style.display = visible ? '' : 'none';
+        }
+        const toggleBtn = document.getElementById('toggle-nav-btn');
+        if (toggleBtn) {
+            toggleBtn.innerHTML = visible
+                ? '<i class="fas fa-eye-slash"></i> Ẩn số câu hỏi'
+                : '<i class="fas fa-eye"></i> Hiện số câu hỏi';
+        }
+    }
+
+    function attachToggleNavEvent() {
+        const toggleBtn = document.getElementById('toggle-nav-btn');
+        if (toggleBtn) {
+            toggleBtn.onclick = function() {
+                navVisible = !navVisible;
+                setNavVisibility(navVisible);
+            };
+        }
     }
 
     function showQuestion() {
@@ -307,7 +333,10 @@ document.addEventListener('DOMContentLoaded', () => {
             </div>
         </div>
     `;
-    // Nếu đã trả lời câu này thì tự động hiển thị đáp án đã chọn, đúng/sai, và giải thích
+    // Sau khi render xong quizSection, gắn lại toggle nav
+    attachToggleNavEvent();
+    setNavVisibility(navVisible);
+        // Nếu đã trả lời câu này thì tự động hiển thị đáp án đã chọn, đúng/sai, và giải thích
     const answeredIdx = userAnswers[currentIndex];
     if (answeredIdx !== null && answeredIdx !== undefined) {
         document.querySelectorAll('.answer-btn').forEach((btn, idx) => {
