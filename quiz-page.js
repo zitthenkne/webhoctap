@@ -270,6 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateProgressBar();
         const question = questions[currentIndex];
+console.log('NOTE DEBUG:', question.note);
 
         // Safeguard against corrupted or incomplete question data
         if (!question || !question.question) {
@@ -321,7 +322,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div id="explanation-area" class="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded hidden">
                 <h4 class="font-bold text-yellow-800 text-lg flex items-center gap-2"><i class="fas fa-lightbulb"></i> Giải thích</h4>
                 <p class="text-yellow-700 mt-1 text-base">${question.explanation || 'Không có giải thích.'}</p>
-                ${question.note && question.note.trim() ? `<div class="mt-3 flex items-start gap-2"><i class="fas fa-sticky-note text-pink-400 mt-1"></i><span class="text-pink-700 text-base"><span class="font-semibold">Ghi chú:</span> ${question.note}</span></div>` : ''}
+                ${question.note && question.note.trim() ? `<div class="mt-3 flex items-start gap-2"><i class="fas fa-sticky-note text-pink-400 mt-1"></i><span class="text-pink-700 text-base"><span class="font-semibold">Ghi chú:</span> ${question.note.replace(/\n/g, '<br>')}</span></div>` : ''}
             </div>
             <div class="mt-8 flex justify-between">
                 <button id="prevBtn" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition ${currentIndex === 0 || quizMode === 'practice' ? 'invisible' : ''}">

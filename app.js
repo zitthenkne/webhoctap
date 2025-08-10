@@ -106,7 +106,8 @@ async function handleLogout() { if (confirm('Bạn có chắc muốn đăng xu�
 function toggleAuthModal() { authModal.classList.toggle('hidden'); }
 async function handleLogin() { const email = document.getElementById('emailInput').value; const password = document.getElementById('passwordInput').value; if (!email || !password) return showToast('Vui lòng nhập đủ thông tin.', 'warning'); try { await signInWithEmailAndPassword(auth, email, password); toggleAuthModal(); showToast('Đăng nhập thành công!', 'success'); } catch (error) { showToast('Đăng nhập thất bại: ' + error.message, 'error'); } }
 async function handleSignup() { const email = document.getElementById('emailInput').value; const password = document.getElementById('passwordInput').value; if (!email || !password) return showToast('Vui lòng nhập đủ thông tin.', 'warning'); try { const userCredential = await createUserWithEmailAndPassword(auth, email, password); const user = userCredential.user; await setDoc(doc(db, "users", user.uid), { email: user.email, createdAt: new Date(), quizSetsCreated: 0 }); showToast('Đăng ký thành công!', 'success'); toggleAuthModal(); } catch (error) { showToast('Đăng ký thất bại: ' + error.message, 'error'); } }
-async function handleFileSelect(e) { const file = e.target.files[0]; if (!file) return; fileNameElem.textContent = file.name; questionCountInfo.textContent = 'Đang phân tích...'; fileInfo.classList.remove('hidden'); processBtn.classList.add('hidden'); saveBtnPreQuiz.classList.add('hidden'); try { const parsedQuestions = await parseFile(file); if (parsedQuestions.length === 0) { questionCountInfo.textContent = 'Lỗi: Không tìm thấy câu hỏi.'; return; } const topics = parsedQuestions.map(q => q.topic); const uniqueTopics = new Set(topics); questions = parsedQuestions; currentQuizTitle = file.name.replace(/\.(xlsx|xls|csv)$/, ''); questionCountInfo.textContent = `✓ Tìm thấy ${questions.length} câu hỏi / ${uniqueTopics.size} chủ đề.`; processBtn.classList.remove('hidden'); saveBtnPreQuiz.classList.remove('hidden'); saveBtnPreQuiz.disabled = false; saveBtnPreQuiz.innerHTML = '<i class="fas fa-save mr-2"></i> Lưu vào thư viện'; } catch (error) { questionCountInfo.textContent = 'Lỗi! Không thể đọc file.'; console.error("Lỗi phân tích file:", error); } }
+async function handleFileSelect(e) {
+    console.log('DEBUG: handleFileSelect triggered', e); const file = e.target.files[0]; if (!file) return; fileNameElem.textContent = file.name; questionCountInfo.textContent = 'Đang phân tích...'; fileInfo.classList.remove('hidden'); processBtn.classList.add('hidden'); saveBtnPreQuiz.classList.add('hidden'); try { const parsedQuestions = await parseFile(file); if (parsedQuestions.length === 0) { questionCountInfo.textContent = 'Lỗi: Không tìm thấy câu hỏi.'; return; } const topics = parsedQuestions.map(q => q.topic); const uniqueTopics = new Set(topics); questions = parsedQuestions; currentQuizTitle = file.name.replace(/\.(xlsx|xls|csv)$/, ''); questionCountInfo.textContent = `✓ Tìm thấy ${questions.length} câu hỏi / ${uniqueTopics.size} chủ đề.`; processBtn.classList.remove('hidden'); saveBtnPreQuiz.classList.remove('hidden'); saveBtnPreQuiz.disabled = false; saveBtnPreQuiz.innerHTML = '<i class="fas fa-save mr-2"></i> Lưu vào thư viện'; } catch (error) { questionCountInfo.textContent = 'Lỗi! Không thể đọc file.'; console.error("Lỗi phân tích file:", error); } }
 function parseFile(file) {
     // Các tên cột tương đương cho từng trường
     const COLUMN_ALIASES = {
@@ -141,6 +142,24 @@ function parseFile(file) {
                 if (!jsonData || jsonData.length < 2) return resolve([]);
                 const headers = jsonData[0].map(h => (h || '').toString().trim().toLowerCase());
                 // Ánh xạ trường logic -> index cột
+                // Cải tiến: Lấy tất cả các cột tiêu đề là alias của note, hoặc tiêu đề rỗng nằm cạnh cột ghi chú, hoặc tiêu đề chứa 'ghi chú', 'note'
+                const noteIndexes = [];
+                headers.forEach((h, idx) => {
+                    const norm = (h || '').toLowerCase();
+                    // Nếu là alias hoặc chứa 'ghi chú'/'note'
+                    if (COLUMN_ALIASES.note.some(alias => norm === alias.trim().toLowerCase()) ||
+                        norm.includes('ghi chú') || norm.includes('note')) {
+                        noteIndexes.push(idx);
+                        // Lấy luôn các cột rỗng tiếp theo (kiểu merge header)
+                        let next = idx + 1;
+                        while (next < headers.length && (!headers[next] || headers[next].trim() === '')) {
+                            noteIndexes.push(next);
+                            next++;
+                        }
+                    }
+                });
+                // Loại bỏ trùng lặp index
+                const uniqueNoteIndexes = [...new Set(noteIndexes)];
                 const colIdx = {};
                 for (const key in COLUMN_ALIASES) {
                     colIdx[key] = findColumnIdx(headers, COLUMN_ALIASES[key]);
@@ -169,6 +188,13 @@ function parseFile(file) {
                     const sourceIdx = colIdx['source'];
                     const levelIdx = colIdx['level'];
                     const noteIdx = colIdx['note'];
+                    // Gộp tất cả các trường note nhỏ thành một chuỗi, mỗi trường một dòng
+                    let noteValue = '';
+                    if (uniqueNoteIndexes.length > 0) {
+                        noteValue = uniqueNoteIndexes.map(idx => row[idx] || '').filter(val => val && String(val).trim() !== '').join('\n');
+                    } else if (noteIdx !== undefined) {
+                        noteValue = row[noteIdx] || '';
+                    }
                     return {
                         question: row[questionIdx],
                         answers: [option1Idx, option2Idx, option3Idx, option4Idx]
@@ -179,7 +205,7 @@ function parseFile(file) {
                         topic: topicIdx !== undefined ? (row[topicIdx] || 'Chung') : 'Chung',
                         source: sourceIdx !== undefined ? (row[sourceIdx] || '') : '',
                         level: levelIdx !== undefined ? (row[levelIdx] || '') : '',
-                        note: noteIdx !== undefined ? (row[noteIdx] || '') : ''
+                        note: noteValue
                     };
                 }).filter(q => q !== null);
                 resolve(parsedQuestions);
