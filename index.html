@@ -45,7 +45,7 @@
                 <li><a href="#" data-target="createQuizContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-plus-circle text-xl w-7 text-center"></i><span>Tạo trắc nghiệm</span></a></li>
                 <li><a href="#" data-target="libraryContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-book text-xl w-7 text-center"></i><span>Thư viện</span></a></li>
                 <li><a href="#" data-target="statsContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-chart-bar text-xl w-7 text-center"></i><span>Thống kê</span></a></li>
-                <li><a href="#" data-target="myStudyRoomsContent" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-[#FFB6C1]/40 hover:to-[#D8BFD8]/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-chalkboard-teacher text-xl w-7 text-center"></i><span>Phòng học của tôi</span></a></li>
+                    <li><a href="checklist.html" id="checklist-atcs-menu" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-blue-200/40 hover:to-blue-100/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-tasks text-xl w-7 text-center"></i><span>Checklist ATCS</span></a></li>
                 <li><a href="waiting-room.html" id="medicalRecordListBtn" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-green-200/40 hover:to-green-100/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-notes-medical text-xl w-7 text-center"></i><span>Danh sách bệnh án</span></a></li>
                 <li><a href="station-exam.html" class="nav-link flex items-center p-3 rounded-2xl text-gray-700 hover:bg-gradient-to-r hover:from-orange-200/40 hover:to-orange-100/40 transition font-bold shadow-sm text-base gap-3"><i class="fas fa-route text-xl w-7 text-center"></i><span>Chạy trạm (OSCE)</span></a></li>
             </ul>
@@ -97,6 +97,11 @@
                         <h3 class="text-lg sm:text-xl font-bold text-gray-800">Viết bệnh án</h3>
                         <p class="text-gray-500 mt-1 text-sm sm:text-base">Vào phòng chờ để bắt đầu viết bệnh án lâm sàng.</p>
                     </button>
+                        <button type="button" id="selectChecklist" class="group bg-white rounded-3xl shadow-xl p-7 sm:p-10 text-center hover:shadow-2xl hover:-translate-y-2 transition-all duration-300 border-2 border-transparent hover:border-blue-400 flex flex-col items-center gap-2 mb-2 px-2 sm:px-4">
+                            <img src="assets/squirrel_A.png" alt="Checklist Squirrel" class="w-32 h-32 mb-2 transition-transform group-hover:scale-110 rounded-xl shadow border-2 border-blue-200 bg-white">
+                            <h3 class="text-lg sm:text-xl font-bold text-gray-800">Tạo Checklist</h3>
+                            <p class="text-gray-500 mt-1 text-sm sm:text-base">Quản lý checklist ATCS, tạo checklist và thư mục cá nhân.</p>
+                        </button>
                 </div>
             </div>
             
@@ -387,6 +392,14 @@ document.addEventListener('DOMContentLoaded', () => {
     window.addEventListener('resize', updateSidebarState);
     // Đảm bảo đúng trạng thái khi load trang
     updateSidebarState();
+
+    // Nút Tạo Checklist chuyển sang checklist.html
+    const selectChecklist = document.getElementById('selectChecklist');
+    if (selectChecklist) {
+        selectChecklist.addEventListener('click', function() {
+            window.location.href = 'checklist.html';
+        });
+    }
 });
 </script>
 <script>
