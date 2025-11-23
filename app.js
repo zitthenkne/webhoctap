@@ -107,7 +107,38 @@ function toggleAuthModal() { authModal.classList.toggle('hidden'); }
 async function handleLogin() { const email = document.getElementById('emailInput').value; const password = document.getElementById('passwordInput').value; if (!email || !password) return showToast('Vui lòng nhập đủ thông tin.', 'warning'); try { await signInWithEmailAndPassword(auth, email, password); toggleAuthModal(); showToast('Đăng nhập thành công!', 'success'); } catch (error) { showToast('Đăng nhập thất bại: ' + error.message, 'error'); } }
 async function handleSignup() { const email = document.getElementById('emailInput').value; const password = document.getElementById('passwordInput').value; if (!email || !password) return showToast('Vui lòng nhập đủ thông tin.', 'warning'); try { const userCredential = await createUserWithEmailAndPassword(auth, email, password); const user = userCredential.user; await setDoc(doc(db, "users", user.uid), { email: user.email, createdAt: new Date(), quizSetsCreated: 0 }); showToast('Đăng ký thành công!', 'success'); toggleAuthModal(); } catch (error) { showToast('Đăng ký thất bại: ' + error.message, 'error'); } }
 async function handleFileSelect(e) {
-    console.log('DEBUG: handleFileSelect triggered', e); const file = e.target.files[0]; if (!file) return; fileNameElem.textContent = file.name; questionCountInfo.textContent = 'Đang phân tích...'; fileInfo.classList.remove('hidden'); processBtn.classList.add('hidden'); saveBtnPreQuiz.classList.add('hidden'); try { const parsedQuestions = await parseFile(file); if (parsedQuestions.length === 0) { questionCountInfo.textContent = 'Lỗi: Không tìm thấy câu hỏi.'; return; } const topics = parsedQuestions.map(q => q.topic); const uniqueTopics = new Set(topics); questions = parsedQuestions; currentQuizTitle = file.name.replace(/\.(xlsx|xls|csv)$/, ''); questionCountInfo.textContent = `✓ Tìm thấy ${questions.length} câu hỏi / ${uniqueTopics.size} chủ đề.`; processBtn.classList.remove('hidden'); saveBtnPreQuiz.classList.remove('hidden'); saveBtnPreQuiz.disabled = false; saveBtnPreQuiz.innerHTML = '<i class="fas fa-save mr-2"></i> Lưu vào thư viện'; } catch (error) { questionCountInfo.textContent = 'Lỗi! Không thể đọc file.'; console.error("Lỗi phân tích file:", error); } }
+    console.log('DEBUG: handleFileSelect triggered', e); 
+    const file = e.target.files[0]; 
+    if (!file) {
+        console.log('No file selected');
+        return;
+    }
+    fileNameElem.textContent = file.name; 
+    questionCountInfo.textContent = 'Đang phân tích...'; 
+    fileInfo.classList.remove('hidden'); 
+    processBtn.classList.add('hidden'); 
+    saveBtnPreQuiz.classList.add('hidden'); 
+    try { 
+        const parsedQuestions = await parseFile(file);
+        console.log('Parsed questions:', parsedQuestions);
+        if (parsedQuestions.length === 0) { 
+            questionCountInfo.textContent = 'Lỗi: Không tìm thấy câu hỏi.'; 
+            return; 
+        } 
+        const topics = parsedQuestions.map(q => q.topic); 
+        const uniqueTopics = new Set(topics); 
+        questions = parsedQuestions; 
+        currentQuizTitle = file.name.replace(/\.(xlsx|xls|csv)$/, ''); 
+        questionCountInfo.textContent = `✓ Tìm thấy ${questions.length} câu hỏi / ${uniqueTopics.size} chủ đề.`; 
+        processBtn.classList.remove('hidden'); 
+        saveBtnPreQuiz.classList.remove('hidden'); 
+        saveBtnPreQuiz.disabled = false; 
+        saveBtnPreQuiz.innerHTML = '<i class="fas fa-save mr-2"></i> Lưu vào thư viện'; 
+    } catch (error) { 
+        questionCountInfo.textContent = 'Lỗi! Không thể đọc file.'; 
+        console.error("Lỗi phân tích file:", error); 
+    } 
+}
 function parseFile(file) {
     // Các tên cột tương đương cho từng trường
     const COLUMN_ALIASES = {
@@ -121,7 +152,8 @@ function parseFile(file) {
         explanation: ['explanation', 'giải thích', 'lý giải', 'giải nghĩa', 'explain', 'giải thích đáp án', 'giải thích lý do', 'diễn giải', 'phân tích đáp án', 'phân tích', 'chi tiết đáp án'],
         source: ['source', 'nguồn', 'tài liệu', 'reference', 'nguon', 'nguồn tham khảo', 'nguồn gốc', 'nguồn đề', 'nguồn câu hỏi', 'tài liệu tham khảo'],
         level: ['level', 'mức độ', 'độ khó', 'difficulty', 'độ khó khăn', 'muc do', 'cấp độ', 'trình độ', 'bậc', 'độ phức tạp'],
-        note: ['note', 'ghi chú', 'ghi chu', 'chú thích', 'comment', 'remark', 'lưu ý', 'nhận xét', 'bổ sung', 'chú giải', 'chú ý']
+        note: ['note', 'ghi chú', 'ghi chu', 'chú thích', 'comment', 'remark', 'lưu ý', 'nhận xét', 'bổ sung', 'chú giải', 'chú ý'],
+        expanded: ['expanded', 'mở rộng', 'mo rong', 'chi tiết mở rộng', 'extended content', 'nội dung mở rộng', 'phần mở rộng']
     };
     // Hàm tìm index cột theo alias
     function findColumnIdx(headers, aliases) {
@@ -188,6 +220,7 @@ function parseFile(file) {
                     const sourceIdx = colIdx['source'];
                     const levelIdx = colIdx['level'];
                     const noteIdx = colIdx['note'];
+                    const expandedIdx = colIdx['expanded'];
                     // Gộp tất cả các trường note nhỏ thành một chuỗi, mỗi trường một dòng
                     let noteValue = '';
                     if (uniqueNoteIndexes.length > 0) {
@@ -205,7 +238,8 @@ function parseFile(file) {
                         topic: topicIdx !== undefined ? (row[topicIdx] || 'Chung') : 'Chung',
                         source: sourceIdx !== undefined ? (row[sourceIdx] || '') : '',
                         level: levelIdx !== undefined ? (row[levelIdx] || '') : '',
-                        note: noteValue
+                        note: noteValue,
+                        expanded: expandedIdx !== undefined ? (row[expandedIdx] || '') : ''
                     };
                 }).filter(q => q !== null);
                 resolve(parsedQuestions);
@@ -232,6 +266,7 @@ async function saveAndStartQuiz() {
     processBtn.innerHTML = 'Đang chuẩn bị...';
 
     try {
+        console.log('DEBUG: Questions before saving:', questions);
         const docRef = await addDoc(collection(db, "quiz_sets"), {
             userId: user.uid,
             title: currentQuizTitle,
@@ -240,6 +275,7 @@ async function saveAndStartQuiz() {
             createdAt: new Date(),
             isPublic: true // Luôn public bộ đề
         });
+        console.log('DEBUG: Quiz saved with ID:', docRef.id);
         await checkCreationAchievements(user.uid);
         window.location.href = `quiz.html?id=${docRef.id}`;
     } catch (e) {
@@ -528,10 +564,11 @@ function downloadTemplate() { const sampleData = [
     'Giải thích', // hoặc: explanation, giải thích
     'Nguồn (Source)', // hoặc: source, nguồn, tài liệu
     'Mức độ (Level)', // hoặc: level, mức độ, độ khó
-    'Ghi chú (Note)' // hoặc: note, ghi chú, comment
+    'Ghi chú (Note)', // hoặc: note, ghi chú, comment
+    'Mở rộng' // hoặc: expanded, mở rộng, chi tiết mở rộng
   ],
   [
-    'Lưu ý: Các cột có dấu ★ là bắt buộc phải nhập. Các cột còn lại có thể bỏ trống.', '', '', '', '', '', '', '', '', '', ''
+    'Lưu ý: Các cột có dấu ★ là bắt buộc phải nhập. Các cột còn lại có thể bỏ trống.', '', '', '', '', '', '', '', '', '', '', ''
   ],
   [
     'Thủ đô của Việt Nam là gì?',
@@ -544,7 +581,8 @@ function downloadTemplate() { const sampleData = [
     'Hà Nội là thủ đô của nước CHXHCN Việt Nam.',
     'SGK Địa lý 4',
     'Nhận biết',
-    'Câu hỏi cơ bản'
+    'Câu hỏi cơ bản',
+    'Hà Nội có diện tích khoảng 3.344 km², với dân số hơn 8 triệu người.'
   ],
   [
     'Vitamin nào tan trong nước?',
@@ -557,7 +595,8 @@ function downloadTemplate() { const sampleData = [
     'Vitamin nhóm B tan trong nước, A/D/K tan trong dầu.',
     'Sách Sinh học nâng cao',
     'Vận dụng',
-    'Có thể gây nhầm lẫn cho học sinh'
+    'Có thể gây nhầm lẫn cho học sinh',
+    'Vitamin B gồm: B1 (thiamine), B2 (riboflavin), B3 (niacin), B5 (pantothenic acid), B6 (pyridoxine), B7 (biotin), B9 (folate), B12 (cobalamine).'
   ]
 ];
 const worksheet = XLSX.utils.aoa_to_sheet(sampleData);
@@ -565,7 +604,7 @@ const workbook = XLSX.utils.book_new();
 XLSX.utils.book_append_sheet(workbook, worksheet, "Zitthenkne Mau");
 worksheet['!cols'] = [
   {wch: 50}, {wch: 25}, {wch: 25}, {wch: 25}, {wch: 25},
-  {wch: 30}, {wch: 25}, {wch: 50}, {wch: 30}, {wch: 20}, {wch: 30}
+  {wch: 30}, {wch: 25}, {wch: 50}, {wch: 30}, {wch: 20}, {wch: 30}, {wch: 50}
 ];
 XLSX.writeFile(workbook, "File mẫu nè.xlsx");
 }

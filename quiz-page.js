@@ -84,6 +84,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (docSnap.exists()) {
                 quizData = docSnap.data();
+                console.log('DEBUG: Quiz data loaded:', quizData);
+                console.log('DEBUG: Questions:', quizData.questions);
                 originalQuestions = quizData.questions; // Lưu câu hỏi gốc
                 loadQuizDetails(); // Cập nhật thông tin trên trang chào mừng
             } else {
@@ -271,6 +273,8 @@ document.addEventListener('DOMContentLoaded', () => {
         updateProgressBar();
         const question = questions[currentIndex];
 console.log('NOTE DEBUG:', question.note);
+console.log('EXPANDED DEBUG:', question.expanded);
+console.log('FULL QUESTION:', question);
 
         // Safeguard against corrupted or incomplete question data
         if (!question || !question.question) {
@@ -324,6 +328,10 @@ console.log('NOTE DEBUG:', question.note);
                 <p class="text-yellow-700 mt-1 text-base">${question.explanation || 'Không có giải thích.'}</p>
                 ${question.note && question.note.trim() ? `<div class="mt-3 flex items-start gap-2"><i class="fas fa-sticky-note text-pink-400 mt-1"></i><span class="text-pink-700 text-base"><span class="font-semibold">Ghi chú:</span> ${question.note.replace(/\n/g, '<br>')}</span></div>` : ''}
             </div>
+            <div id="expanded-area" class="mt-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded hidden">
+                <h4 class="font-bold text-blue-800 text-lg flex items-center gap-2"><i class="fas fa-expand"></i> Mở rộng</h4>
+                <p class="text-blue-700 mt-2 text-base whitespace-pre-wrap">${question.expanded ? question.expanded.replace(/\n/g, '<br>') : ''}</p>
+            </div>
             <div class="mt-8 flex justify-between">
                 <button id="prevBtn" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition ${currentIndex === 0 || quizMode === 'practice' ? 'invisible' : ''}">
                     Câu trước
@@ -337,8 +345,13 @@ console.log('NOTE DEBUG:', question.note);
     // Sau khi render xong quizSection, gắn lại toggle nav
     attachToggleNavEvent();
     setNavVisibility(navVisible);
+    
+    // DEBUG: Kiểm tra element có trong DOM không
+    console.log('DEBUG: After render - expanded-area in DOM:', document.getElementById('expanded-area'));
+    
         // Nếu đã trả lời câu này thì tự động hiển thị đáp án đã chọn, đúng/sai, và giải thích
     const answeredIdx = userAnswers[currentIndex];
+    console.log('DEBUG: answeredIdx:', answeredIdx, 'currentIndex:', currentIndex, 'userAnswers:', userAnswers);
     if (answeredIdx !== null && answeredIdx !== undefined) {
         document.querySelectorAll('.answer-btn').forEach((btn, idx) => {
             btn.disabled = true;
@@ -363,6 +376,21 @@ console.log('NOTE DEBUG:', question.note);
         // Hiện giải thích
         const explanationArea = document.getElementById('explanation-area');
         if (explanationArea) explanationArea.classList.remove('hidden');
+        // Hiện mở rộng (nếu có nội dung)
+        const expandedArea = document.getElementById('expanded-area');
+        console.log('DEBUG expandedArea element:', expandedArea);
+        console.log('DEBUG question.expanded value:', question.expanded);
+        console.log('DEBUG String(question.expanded).trim():', question.expanded ? String(question.expanded).trim() : 'NULL');
+        console.log('DEBUG Full condition check:');
+        console.log('  - expandedArea exists:', !!expandedArea);
+        console.log('  - question.expanded truthy:', !!question.expanded);
+        console.log('  - String.trim() has content:', question.expanded ? !!String(question.expanded).trim() : false);
+        if (expandedArea && question.expanded && String(question.expanded).trim()) {
+            console.log('DEBUG: ✓ Showing expanded area - removing hidden');
+            expandedArea.classList.remove('hidden');
+        } else {
+            console.log('DEBUG: ✗ NOT showing expanded area');
+        }
         // Hiện nút tiếp theo
         const nextBtn = document.getElementById('nextBtn');
         if (nextBtn) {
@@ -774,6 +802,7 @@ function updateProgressBar() {
 
 // === HÀM XỬ LÝ KHI CHỌN ĐÁP ÁN ===
 function handleAnswerClick(e) {
+    console.log('DEBUG: handleAnswerClick called!');
     // Nếu đang ở chế độ không xem đáp án ngay, chỉ lưu đáp án, không hiện đúng/sai
     if (!quizOptions.showAnswerImmediately) {
         const selectedBtn = e.currentTarget;
@@ -840,6 +869,13 @@ function handleAnswerClick(e) {
     // Hiện giải thích
     const explanationArea = document.getElementById('explanation-area');
     if (explanationArea) explanationArea.classList.remove('hidden');
+    
+    // Hiện mở rộng (nếu có nội dung)
+    const expandedArea = document.getElementById('expanded-area');
+    const question = questions[currentIndex];
+    if (expandedArea && question.expanded && String(question.expanded).trim()) {
+        expandedArea.classList.remove('hidden');
+    }
 
     // Hiện nút tiếp theo
     const nextBtn = document.getElementById('nextBtn');
