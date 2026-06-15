@@ -504,9 +504,33 @@ async function loadAndDisplayLibrary() {
     }
 
     try {
-        // Tải thư mục từ LocalStorage theo userId để tránh lỗi phân quyền Firestore Rules
+        // Tự động di cư thư mục từ localStorage lên Firestore nếu có
         const localFoldersKey = `quiz_folders_${user.uid}`;
-        userFolders = JSON.parse(localStorage.getItem(localFoldersKey) || '[]');
+        const localFolders = JSON.parse(localStorage.getItem(localFoldersKey) || '[]');
+        if (localFolders.length > 0) {
+            try {
+                for (const folder of localFolders) {
+                    const folderDocRef = doc(db, "quiz_folders", folder.id);
+                    await setDoc(folderDocRef, {
+                        userId: user.uid,
+                        name: folder.name,
+                        color: folder.color,
+                        icon: folder.icon,
+                        createdAt: folder.createdAt || new Date().toISOString()
+                      });
+                }
+                localStorage.removeItem(localFoldersKey);
+                if (typeof showToast === 'function') showToast('Đã đồng bộ thư mục cũ lên đám mây!', 'success');
+            } catch (migrationErr) {
+                console.warn("Chưa thể đồng bộ thư mục cũ (có thể do Firebase Rules chưa cập nhật):", migrationErr);
+            }
+        }
+
+        // Tải danh sách thư mục từ Firestore
+        const qFolders = query(collection(db, "quiz_folders"), where("userId", "==", user.uid));
+        const querySnapshotFolders = await getDocs(qFolders);
+        userFolders = querySnapshotFolders.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        userFolders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         // Tải bộ đề từ Firestore
         const q = query(collection(db, "quiz_sets"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
@@ -2053,12 +2077,9 @@ async function saveFolder() {
     }
 
     try {
-        const localFoldersKey = `quiz_folders_${user.uid}`;
-        let folders = JSON.parse(localStorage.getItem(localFoldersKey) || '[]');
-
         if (folderModalMode === 'create') {
-            folders.push({
-                id: 'folder_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+            await addDoc(collection(db, "quiz_folders"), {
+                userId: user.uid,
                 name: folderName,
                 color: selectedFolderColor,
                 icon: selectedFolderIcon,
@@ -2066,16 +2087,15 @@ async function saveFolder() {
             });
             if (typeof showToast === 'function') showToast('Đã tạo thư mục!', 'success');
         } else {
-            const folder = folders.find(f => f.id === activeFolderId);
-            if (folder) {
-                folder.name = folderName;
-                folder.color = selectedFolderColor;
-                folder.icon = selectedFolderIcon;
-            }
+            const folderRef = doc(db, "quiz_folders", activeFolderId);
+            await updateDoc(folderRef, {
+                name: folderName,
+                color: selectedFolderColor,
+                icon: selectedFolderIcon
+            });
             if (typeof showToast === 'function') showToast('Đã cập nhật thư mục!', 'success');
         }
 
-        localStorage.setItem(localFoldersKey, JSON.stringify(folders));
         closeFolderModal();
         await loadAndDisplayLibrary();
     } catch (err) {
@@ -2122,10 +2142,8 @@ async function confirmDeleteFolder(folderId) {
     if (!confirm("Bạn có chắc chắn muốn xóa thư mục này? Các bộ đề bên trong sẽ được chuyển về thư mục gốc (không bị xóa).")) return;
     
     try {
-        const localFoldersKey = `quiz_folders_${user.uid}`;
-        let folders = JSON.parse(localStorage.getItem(localFoldersKey) || '[]');
-        folders = folders.filter(f => f.id !== folderId);
-        localStorage.setItem(localFoldersKey, JSON.stringify(folders));
+        const folderRef = doc(db, "quiz_folders", folderId);
+        await deleteDoc(folderRef);
 
         // Đưa các bộ đề trong thư mục này về Root trên Firestore (không bị xóa)
         const quizzesToUpdate = userQuizSets.filter(q => q.folderId === folderId);
