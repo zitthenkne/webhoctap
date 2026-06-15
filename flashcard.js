@@ -2,6 +2,42 @@ import { db, auth } from './firebase-init.js';
 import { doc, getDoc } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js";
 import { showToast } from './utils.js';
 
+function renderMath(element) {
+    if (window.renderMathInElement && element) {
+        try {
+            window.renderMathInElement(element, {
+                delimiters: [
+                    {left: "$$", right: "$$", display: true},
+                    {left: "$", right: "$", display: false},
+                    {left: "\\(", right: "\\)", display: false},
+                    {left: "\\[", right: "\\[", display: true}
+                ],
+                throwOnError: false
+            });
+        } catch (err) {
+            console.error("Lỗi render công thức KaTeX:", err);
+        }
+    } else if (element) {
+        setTimeout(() => {
+            if (window.renderMathInElement) {
+                try {
+                    window.renderMathInElement(element, {
+                        delimiters: [
+                            {left: "$$", right: "$$", display: true},
+                            {left: "$", right: "$", display: false},
+                            {left: "\\(", right: "\\)", display: false},
+                            {left: "\\[", right: "\\[", display: true}
+                        ],
+                        throwOnError: false
+                    });
+                } catch (err) {
+                    console.error("Lỗi render công thức KaTeX sau khi chờ:", err);
+                }
+            }
+        }, 200);
+    }
+}
+
 // --- Lấy ID bộ đề từ URL ---
 const urlParams = new URLSearchParams(window.location.search);
 const quizId = urlParams.get('id');
@@ -165,6 +201,7 @@ function showCard(index) {
     markKeysHint.classList.add('hidden');
     flashcardInner.classList.remove('is-flipped');
     front.innerHTML = `<p class="text-2xl font-semibold">${cardData.question}</p>`;
+    renderMath(front);
     // Ghi chú cá nhân (localStorage)
     const noteKey = `flashcard_note_${quizId}_${index}`;
     let savedNote = localStorage.getItem(noteKey) || '';
@@ -182,6 +219,7 @@ function showCard(index) {
         <textarea id="flashcard-note" class="w-full mt-2 p-2 border rounded bg-pink-50 text-gray-700" rows="2" placeholder="Ghi chú cá nhân...">${savedNote}</textarea>
         <div class="text-xs text-gray-400 mt-1">Ghi chú này chỉ lưu trên thiết bị của bạn.</div>
     `;
+    renderMath(back);
     setTimeout(() => {
         const noteInput = document.getElementById('flashcard-note');
         if (noteInput) {
@@ -367,6 +405,7 @@ function renderGridView() {
             </div>
         `).join('') + '</div>';
     bindFilterEvents();
+    renderMath(flashcardContainer);
 }
 
 window.renderSingleCard = function(idx) {
@@ -386,6 +425,7 @@ function renderQuickReviewView() {
             </div>
         `).join('') + '</div>';
     bindFilterEvents();
+    renderMath(flashcardContainer);
 }
 
 function bindFilterEvents() {

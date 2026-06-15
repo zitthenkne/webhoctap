@@ -4,6 +4,52 @@ import { doc, getDoc, collection, addDoc } from "https://www.gstatic.com/firebas
 import { checkAndAwardAchievement, achievements } from './achievements.js';
 import { showToast } from './utils.js';
 
+function renderMath(element) {
+    if (window.renderMathInElement && element) {
+        try {
+            window.renderMathInElement(element, {
+                delimiters: [
+                    {left: "$$", right: "$$", display: true},
+                    {left: "$", right: "$", display: false},
+                    {left: "\\(", right: "\\)", display: false},
+                    {left: "\\[", right: "\\[", display: true}
+                ],
+                throwOnError: false
+            });
+        } catch (err) {
+            console.error("Lỗi render công thức KaTeX:", err);
+        }
+    } else if (element) {
+        setTimeout(() => {
+            if (window.renderMathInElement) {
+                try {
+                    window.renderMathInElement(element, {
+                        delimiters: [
+                            {left: "$$", right: "$$", display: true},
+                            {left: "$", right: "$", display: false},
+                            {left: "\\(", right: "\\)", display: false},
+                            {left: "\\[", right: "\\[", display: true}
+                        ],
+                        throwOnError: false
+                    });
+                } catch (err) {
+                    console.error("Lỗi render công thức KaTeX sau khi chờ:", err);
+                }
+            }
+        }, 200);
+    }
+}
+
+function triggerConfetti() {
+    if (typeof confetti === 'function') {
+        confetti({
+            particleCount: 80,
+            spread: 60,
+            origin: { y: 0.8 }
+        });
+    }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // --- Kiểm tra trạng thái quiz trong localStorage ---
     const savedStateStr = localStorage.getItem('quizState');
@@ -67,6 +113,133 @@ document.addEventListener('DOMContentLoaded', () => {
          // Bộ câu hỏi đang hiển thị (lượt đầu hoặc ôn tập)
                 // Các câu hỏi được đánh dấu "chưa thuộc" trong lượt hiện tại
     let markedQuestions = [];
+    let currentFontSize = localStorage.getItem('quiz_font_size') || 'normal';
+    let streak = 0;
+    let used5050Questions = {};
+    let focusMode = false;
+
+
+    function setupFontSizeControls() {
+        const btnSmall = document.getElementById('font-size-small');
+        const btnNormal = document.getElementById('font-size-normal');
+        const btnLarge = document.getElementById('font-size-large');
+        if (!btnSmall || !btnNormal || !btnLarge) return;
+
+        function updateActiveButton(size) {
+            [btnSmall, btnNormal, btnLarge].forEach(btn => {
+                btn.classList.remove('bg-pink-500', 'text-white');
+                btn.classList.add('text-gray-600', 'hover:bg-pink-100');
+            });
+            let activeBtn = btnNormal;
+            if (size === 'small') activeBtn = btnSmall;
+            else if (size === 'large') activeBtn = btnLarge;
+
+            activeBtn.classList.remove('text-gray-600', 'hover:bg-pink-100');
+            activeBtn.classList.add('bg-pink-500', 'text-white');
+        }
+
+        updateActiveButton(currentFontSize);
+
+        btnSmall.onclick = () => {
+            currentFontSize = 'small';
+            localStorage.setItem('quiz_font_size', 'small');
+            updateActiveButton('small');
+            if (quizContainer && !quizContainer.classList.contains('hidden')) {
+                showQuestion();
+            }
+        };
+        btnNormal.onclick = () => {
+            currentFontSize = 'normal';
+            localStorage.setItem('quiz_font_size', 'normal');
+            updateActiveButton('normal');
+            if (quizContainer && !quizContainer.classList.contains('hidden')) {
+                showQuestion();
+            }
+        };
+        btnLarge.onclick = () => {
+            currentFontSize = 'large';
+            localStorage.setItem('quiz_font_size', 'large');
+            updateActiveButton('large');
+            if (quizContainer && !quizContainer.classList.contains('hidden')) {
+                showQuestion();
+            }
+        };
+    }
+    setupFontSizeControls();
+
+    function handle5050Help() {
+        if (userAnswers[currentIndex] !== null || used5050Questions[currentIndex]) return;
+
+        const correctAnswerIdx = questions[currentIndex].correctAnswerIndex;
+        const answerBtns = document.querySelectorAll('.answer-btn');
+        if (answerBtns.length <= 2) {
+            showToast('Không thể sử dụng 50:50 khi số đáp án ít hơn hoặc bằng 2!');
+            return;
+        }
+
+        const incorrectIndices = [];
+        answerBtns.forEach((btn, idx) => {
+            if (idx !== correctAnswerIdx) {
+                incorrectIndices.push(idx);
+            }
+        });
+
+        // Xáo trộn ngẫu nhiên mảng các đáp án sai
+        for (let i = incorrectIndices.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [incorrectIndices[i], incorrectIndices[j]] = [incorrectIndices[j], incorrectIndices[i]];
+        }
+
+        // Chọn ra 2 đáp án sai để ẩn
+        const toHide = incorrectIndices.slice(0, 2);
+        
+        answerBtns.forEach((btn, idx) => {
+            if (toHide.includes(idx)) {
+                btn.disabled = true;
+                btn.classList.add('opacity-20', 'border-gray-300', 'cursor-not-allowed');
+                btn.classList.remove('hover:bg-[#FFB6C1]/50', 'hover:border-[#FF69B4]', 'hover:scale-[1.01]', 'hover:-translate-y-0.5');
+            }
+        });
+
+        // Lưu trạng thái ẩn để giữ nhất quán khi quay lại câu cũ
+        used5050Questions[currentIndex] = toHide;
+        
+        const btn5050 = document.getElementById('help-5050-btn');
+        if (btn5050) {
+            btn5050.disabled = true;
+            btn5050.classList.add('opacity-50', 'cursor-not-allowed');
+            btn5050.classList.remove('hover:bg-blue-100');
+        }
+
+        showToast('Đã loại bỏ 2 đáp án sai!');
+    }
+
+    function toggleFocusMode() {
+        focusMode = !focusMode;
+        document.body.classList.toggle('focus-mode-active', focusMode);
+        
+        const exitFocusBtn = document.getElementById('exit-focus-btn');
+        if (exitFocusBtn) {
+            exitFocusBtn.classList.toggle('hidden', !focusMode);
+        }
+
+        // Tự động ẩn navigator khi bật focus mode
+        const navWrapper = document.getElementById('question-nav-wrapper');
+        if (focusMode) {
+            if (navWrapper) navWrapper.style.display = 'none';
+        } else {
+            // Khôi phục hiển thị navigator theo biến navVisible ban đầu
+            setNavVisibility(navVisible);
+        }
+    }
+
+    function setupFocusModeControls() {
+        const focusModeBtn = document.getElementById('focus-mode-btn');
+        const exitFocusBtn = document.getElementById('exit-focus-btn');
+        if (focusModeBtn) focusModeBtn.onclick = toggleFocusMode;
+        if (exitFocusBtn) exitFocusBtn.onclick = toggleFocusMode;
+    }
+    setupFocusModeControls();
 
     // Hàm tải dữ liệu bộ đề từ Firestore dựa vào ID trên URL
     async function loadQuizData() {
@@ -106,6 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (quizData) {
             quizTitle.textContent = quizData.title;
             quizInfo.textContent = `Bộ đề có ${quizData.questionCount} câu hỏi. Sẵn sàng để chinh phục chưa?`;
+            document.title = quizData.title; // Cập nhật tiêu đề trang web theo tên bộ đề
         }
         // Preview logic handled separately
     }
@@ -156,6 +330,8 @@ document.addEventListener('DOMContentLoaded', () => {
             score = 0;
             quizStartTime = new Date();
             markedQuestions = [];
+            streak = 0;
+            used5050Questions = {};
         }
 
         if (quizTimerInterval) clearInterval(quizTimerInterval);
@@ -189,18 +365,50 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 0; i < total; i++) {
             const isAnswered = userAnswers[i] !== null;
             const isMarked = markedQuestions.includes(i);
-            navHtml += `<button class="quiz-nav-btn ${i === currentIndex ? 'bg-[#FF69B4] text-white' : isAnswered ? 'bg-green-100' : 'bg-gray-100'} ${isMarked ? 'border-2 border-yellow-400' : ''} rounded-full w-8 h-8 mx-1 my-1 text-sm font-bold focus:outline-none" data-qidx="${i}" title="Câu ${i+1}${isMarked ? ' (Đánh dấu)' : ''}">${i+1}</button>`;
+            
+            let btnClass = '';
+            let markerHtml = '';
+            
+            if (isMarked) {
+                markerHtml = `<span class="absolute -top-1 -right-1 flex h-3 w-3"><span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-yellow-400 opacity-75"></span><span class="relative inline-flex rounded-full h-3 w-3 bg-yellow-500"></span></span>`;
+            }
+
+            if (i === currentIndex) {
+                btnClass = 'bg-[#FF69B4] text-white shadow-md ring-2 ring-pink-300 transform scale-110 z-10';
+            } else if (isAnswered) {
+                if (quizOptions.showAnswerImmediately) {
+                    const isCorrect = userAnswers[i] === questions[i].correctAnswerIndex;
+                    if (isCorrect) {
+                        btnClass = 'bg-green-500 text-white border border-green-600 shadow-sm';
+                    } else {
+                        btnClass = 'bg-red-500 text-white border border-red-600 shadow-sm';
+                    }
+                } else {
+                    btnClass = 'bg-blue-400 text-white shadow-sm';
+                }
+            } else {
+                btnClass = 'bg-gray-100 text-gray-600 border border-gray-200 hover:bg-gray-200';
+            }
+            
+            navHtml += `
+                <button type="button" class="quiz-nav-btn relative rounded-full w-9 h-9 mx-1 my-1 text-sm font-bold focus:outline-none transition-all ${btnClass}" data-qidx="${i}" title="Câu ${i+1}${isMarked ? ' (Đánh dấu)' : ''}">
+                    ${i+1}
+                    ${markerHtml}
+                </button>
+            `;
         }
         return `
             <div class="mb-4">
-                <div class="w-full h-3 bg-gray-200 rounded-full overflow-hidden mb-2">
-                    <div class="h-full bg-[#FF69B4] transition-all duration-300" style="width:${percent}%"></div>
+                <div class="w-full h-4 bg-gray-100 rounded-full overflow-hidden mb-2 shadow-inner border border-gray-200/50 focus-hide">
+                    <div class="h-full bg-gradient-to-r from-pink-400 via-purple-400 to-indigo-500 transition-all duration-500 relative" style="width:${percent}%">
+                        <div class="absolute inset-0 bg-white/20 bg-striped animate-stripes"></div>
+                    </div>
                 </div>
-                <div class="flex justify-between items-center text-xs text-gray-600 mb-2">
-                    <span>Đã trả lời: ${answeredCount}/${total}</span>
-                    <span>Còn lại: ${total - answeredCount}</span>
+                <div class="flex justify-between items-center text-xs text-gray-600 mb-2 px-1 focus-hide">
+                    <span class="font-medium">Đã trả lời: ${answeredCount}/${total} (${percent}%)</span>
+                    <span class="font-medium">Còn lại: ${total - answeredCount}</span>
                 </div>
-                <div id="question-nav-wrapper" class="flex flex-wrap justify-center">${navHtml}</div>
+                <div id="question-nav-wrapper" class="flex flex-wrap justify-center mt-3 bg-gray-50/50 p-2 rounded-xl border border-gray-100 focus-hide">${navHtml}</div>
             </div>
         `;
     }
@@ -250,28 +458,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function showQuestion() {
-    // ...
-    // Nếu là chế độ không xem đáp án ngay, khi đã chọn đáp án thì chỉ highlight đáp án đã chọn, không hiện đúng/sai
-    if (!quizOptions.showAnswerImmediately && userAnswers[currentIndex] !== null) {
-        // Lấy các nút đáp án
-        const answerBtns = document.querySelectorAll('.answer-btn');
-        answerBtns.forEach((btn, idx) => {
-            btn.disabled = true;
-            if (userAnswers[currentIndex] === idx) {
-                btn.classList.add('bg-blue-100', 'border-blue-400');
-            }
-        });
-        // Ẩn giải thích nếu có
-        const explanationArea = document.getElementById('explanation-area');
-        if (explanationArea) explanationArea.classList.add('hidden');
-        // Hiện nút tiếp theo
-        const nextBtn = document.getElementById('nextBtn');
-        if (nextBtn) nextBtn.classList.remove('hidden');
-        return;
-    }
-
         updateProgressBar();
         const question = questions[currentIndex];
+
+        let qSizeClass = 'text-2xl';
+        let aSizeClass = 'text-lg';
+        if (currentFontSize === 'small') {
+            qSizeClass = 'text-lg';
+            aSizeClass = 'text-base';
+        } else if (currentFontSize === 'large') {
+            qSizeClass = 'text-3xl';
+            aSizeClass = 'text-xl';
+        }
 console.log('NOTE DEBUG:', question.note);
 console.log('EXPANDED DEBUG:', question.expanded);
 console.log('FULL QUESTION:', question);
@@ -300,22 +498,27 @@ console.log('FULL QUESTION:', question);
                 <h2 class="text-xl font-bold text-gray-700">${title}</h2>
                 
             </div>
-            <div class="mb-2 flex flex-wrap items-center gap-2">
+            <div class="mb-2 flex flex-wrap items-center gap-2 focus-hide">
                 <span class="inline-block px-3 py-1 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold border border-blue-200">
                     <i class="fas fa-tag mr-1"></i> Chủ đề: ${question.topic ? question.topic : 'Chung'}
                 </span>
                 ${question.level && question.level.trim() ? `<span class="inline-block px-3 py-1 rounded-full bg-purple-100 text-purple-700 text-xs font-semibold border border-purple-200"><i class="fas fa-layer-group mr-1"></i> Mức độ: ${question.level}</span>` : ''}
                 ${question.source && question.source.trim() ? `<span class="inline-block px-3 py-1 rounded-full bg-pink-100 text-pink-700 text-xs font-semibold border border-pink-200"><i class="fas fa-book mr-1"></i> Nguồn: ${question.source}</span>` : ''}
+                ${streak > 0 ? `<span id="streak-badge" class="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-700 text-xs font-semibold border border-orange-200 animate-pulse"><i class="fas fa-fire mr-1 text-orange-500 animate-bounce"></i> Chuỗi đúng: ${streak}</span>` : ''}
             </div>
-            <h3 class="text-2xl font-semibold text-gray-800 my-6 text-center">${question.question}</h3>
+            <h3 class="font-semibold text-gray-800 my-6 text-center ${qSizeClass}">${question.question}</h3>
             <div id="answers-container" class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 ${answerOptions.map((answer, index) => `
-                    <button class="answer-btn p-4 border border-pink-200 rounded-lg text-left hover:bg-[#FFB6C1]/50 hover:border-[#FF69B4] transition text-lg" data-index="${index}">
+                    <button class="answer-btn p-4 border border-pink-200 rounded-lg text-left hover:bg-[#FFB6C1]/50 hover:border-[#FF69B4] hover:scale-[1.01] hover:-translate-y-0.5 transition-all ${aSizeClass}" data-index="${index}">
+                        <span class="inline-block w-8 h-8 rounded-full bg-pink-50 text-[#FF69B4] border border-pink-200 text-center leading-7 font-bold mr-2 text-sm">${String.fromCharCode(65 + index)}</span>
                         ${answer}
                     </button>
                 `).join('')}
             </div>
             <div class="mt-4 flex flex-wrap justify-end gap-2">
+                <button type="button" id="help-5050-btn" class="px-4 py-2 rounded-lg border border-blue-400 text-blue-700 bg-blue-50 hover:bg-blue-100 transition flex items-center gap-2">
+                    <i class="fas fa-life-ring"></i> Trợ giúp 50:50
+                </button>
                 <button id="mark-question-btn" class="px-4 py-2 rounded-lg border border-yellow-400 text-yellow-700 bg-yellow-50 hover:bg-yellow-100 transition flex items-center gap-2">
                     <i class="fas fa-flag"></i> ${markedQuestions.includes(currentIndex) ? 'Bỏ đánh dấu' : 'Đánh dấu câu này'}
                 </button>
@@ -323,14 +526,40 @@ console.log('FULL QUESTION:', question);
                     <i class="fas fa-eye"></i> Xem các câu đã đánh dấu
                 </button>
             </div>
-            <div id="explanation-area" class="mt-6 p-4 bg-yellow-50 border-l-4 border-yellow-400 rounded hidden">
-                <h4 class="font-bold text-yellow-800 text-lg flex items-center gap-2"><i class="fas fa-lightbulb"></i> Giải thích</h4>
-                <p class="text-yellow-700 mt-1 text-base">${question.explanation || 'Không có giải thích.'}</p>
-                ${question.note && question.note.trim() ? `<div class="mt-3 flex items-start gap-2"><i class="fas fa-sticky-note text-pink-400 mt-1"></i><span class="text-pink-700 text-base"><span class="font-semibold">Ghi chú:</span> ${question.note.replace(/\n/g, '<br>')}</span></div>` : ''}
+            <!-- Ghi chú cá nhân -->
+            <div class="mt-6 p-4 bg-pink-50/50 border border-pink-100 rounded-xl focus-hide">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="font-bold text-gray-700 text-sm flex items-center gap-2">
+                        <i class="fas fa-sticky-note text-pink-500 animate-pulse"></i> Ghi chú cá nhân của bạn
+                    </h4>
+                    <span id="note-save-status" class="text-xs text-green-600 font-medium opacity-0 transition-opacity duration-300">
+                        <i class="fas fa-check-circle mr-1"></i>Đã tự động lưu
+                    </span>
+                </div>
+                <textarea id="personal-note-input" 
+                    class="w-full p-3 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-300 text-sm text-gray-700 placeholder-gray-400 bg-white/80 resize-none shadow-sm transition-all" 
+                    rows="2" 
+                    placeholder="Nhập ghi chú cá nhân của bạn cho câu hỏi này (sẽ được tự động lưu)..."></textarea>
             </div>
-            <div id="expanded-area" class="mt-6 p-4 bg-blue-50 border-l-4 border-blue-400 rounded hidden">
-                <h4 class="font-bold text-blue-800 text-lg flex items-center gap-2"><i class="fas fa-expand"></i> Mở rộng</h4>
-                <p class="text-blue-700 mt-2 text-base whitespace-pre-wrap">${question.expanded ? question.expanded.replace(/\n/g, '<br>') : ''}</p>
+            <div id="explanation-area" class="mt-6 p-6 bg-gradient-to-r from-amber-50 to-orange-50 border-l-8 border-amber-400 rounded-xl shadow-inner hidden fade-in animate__animated animate__fadeIn">
+                <h4 class="font-extrabold text-amber-800 text-xl flex items-center gap-2 mb-3">
+                    <i class="fas fa-lightbulb text-amber-500 animate-pulse"></i> Giải thích chi tiết
+                </h4>
+                <div class="text-amber-950 leading-relaxed text-base border-b border-amber-100 pb-3">${question.explanation || 'Không có giải thích.'}</div>
+                ${question.note && question.note.trim() ? `
+                <div class="mt-4 flex items-start gap-3 bg-white/60 p-3 rounded-lg border border-pink-100">
+                    <i class="fas fa-thumbtack text-pink-500 mt-1 animate-bounce"></i>
+                    <div class="text-pink-800 text-base">
+                        <span class="font-bold">Ghi chú ghi nhớ:</span> 
+                        <div class="mt-1">${question.note.replace(/\n/g, '<br>')}</div>
+                    </div>
+                </div>` : ''}
+            </div>
+            <div id="expanded-area" class="mt-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-l-8 border-blue-400 rounded-xl shadow-inner hidden fade-in animate__animated animate__fadeIn">
+                <h4 class="font-extrabold text-blue-800 text-xl flex items-center gap-2 mb-3">
+                    <i class="fas fa-expand text-blue-500 animate-pulse"></i> Mở rộng kiến thức
+                </h4>
+                <p class="text-blue-900 leading-relaxed text-base whitespace-pre-wrap">${question.expanded ? question.expanded.replace(/\n/g, '<br>') : ''}</p>
             </div>
             <div class="mt-8 flex justify-between">
                 <button id="prevBtn" class="px-6 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition ${currentIndex === 0 || quizMode === 'practice' ? 'invisible' : ''}">
@@ -342,6 +571,7 @@ console.log('FULL QUESTION:', question);
             </div>
         </div>
     `;
+    renderMath(quizSection);
     // Sau khi render xong quizSection, gắn lại toggle nav
     attachToggleNavEvent();
     setNavVisibility(navVisible);
@@ -349,10 +579,50 @@ console.log('FULL QUESTION:', question);
     // DEBUG: Kiểm tra element có trong DOM không
     console.log('DEBUG: After render - expanded-area in DOM:', document.getElementById('expanded-area'));
     
-        // Nếu đã trả lời câu này thì tự động hiển thị đáp án đã chọn, đúng/sai, và giải thích
     const answeredIdx = userAnswers[currentIndex];
+    const btn5050 = document.getElementById('help-5050-btn');
+    const hiddenIndices = used5050Questions[currentIndex];
+    
+    if (hiddenIndices) {
+        const answerBtns = document.querySelectorAll('.answer-btn');
+        answerBtns.forEach((btn, idx) => {
+            if (hiddenIndices.includes(idx)) {
+                btn.disabled = true;
+                btn.classList.add('opacity-20', 'border-gray-300', 'cursor-not-allowed');
+                btn.classList.remove('hover:bg-[#FFB6C1]/50', 'hover:border-[#FF69B4]', 'hover:scale-[1.01]', 'hover:-translate-y-0.5');
+            }
+        });
+    }
+
+    if (btn5050) {
+        if (answeredIdx !== null || hiddenIndices) {
+            btn5050.disabled = true;
+            btn5050.classList.add('opacity-50', 'cursor-not-allowed');
+            btn5050.classList.remove('hover:bg-blue-100');
+        } else {
+            btn5050.onclick = handle5050Help;
+        }
+    }
+
+    // Nếu đã trả lời câu này thì tự động hiển thị đáp án đã chọn, đúng/sai, và giải thích
     console.log('DEBUG: answeredIdx:', answeredIdx, 'currentIndex:', currentIndex, 'userAnswers:', userAnswers);
     if (answeredIdx !== null && answeredIdx !== undefined) {
+        if (!quizOptions.showAnswerImmediately) {
+            document.querySelectorAll('.answer-btn').forEach((btn, idx) => {
+                btn.disabled = true;
+                if (idx === answeredIdx) {
+                    btn.classList.add('bg-blue-100', 'border-blue-400');
+                }
+            });
+            const explanationArea = document.getElementById('explanation-area');
+            if (explanationArea) explanationArea.classList.add('hidden');
+            const nextBtn = document.getElementById('nextBtn');
+            if (nextBtn) {
+                nextBtn.classList.remove('hidden');
+                nextBtn.addEventListener('click', showNextQuestion, { once: true });
+            }
+            return;
+        }
         document.querySelectorAll('.answer-btn').forEach((btn, idx) => {
             btn.disabled = true;
             const isCorrectAnswer = (idx === questions[currentIndex].correctAnswerIndex);
@@ -435,6 +705,63 @@ console.log('FULL QUESTION:', question);
             }
         });
     }
+
+    // Xử lý ghi chú cá nhân
+    const noteInput = document.getElementById('personal-note-input');
+    const noteStatus = document.getElementById('note-save-status');
+    if (noteInput) {
+        const quizIdKey = (quizData && quizData.id) || (new URLSearchParams(window.location.search)).get('id') || 'default_quiz';
+        const storageKey = `quiz_notes_${quizIdKey}`;
+        let notesObj = {};
+        try {
+            notesObj = JSON.parse(localStorage.getItem(storageKey) || '{}');
+        } catch(e) {
+            console.error("Lỗi đọc ghi chú cá nhân:", e);
+        }
+        
+        const qText = question.question;
+        noteInput.value = notesObj[qText] || '';
+        
+        let saveTimeout;
+        noteInput.addEventListener('input', (e) => {
+            clearTimeout(saveTimeout);
+            if (noteStatus) {
+                noteStatus.innerHTML = '<i class="fas fa-spinner fa-spin mr-1"></i>Đang lưu...';
+                noteStatus.classList.remove('opacity-0', 'text-green-600');
+                noteStatus.classList.add('opacity-100', 'text-gray-500');
+            }
+            
+            saveTimeout = setTimeout(() => {
+                const updatedVal = e.target.value;
+                try {
+                    const currentNotes = JSON.parse(localStorage.getItem(storageKey) || '{}');
+                    if (updatedVal.trim() === '') {
+                        delete currentNotes[qText];
+                    } else {
+                        currentNotes[qText] = updatedVal;
+                    }
+                    localStorage.setItem(storageKey, JSON.stringify(currentNotes));
+                    
+                    if (noteStatus) {
+                        noteStatus.innerHTML = '<i class="fas fa-check-circle mr-1"></i>Đã tự động lưu';
+                        noteStatus.classList.remove('text-gray-500');
+                        noteStatus.classList.add('text-green-600');
+                        setTimeout(() => {
+                            noteStatus.classList.add('opacity-0');
+                            noteStatus.classList.remove('opacity-100');
+                        }, 1500);
+                    }
+                } catch(err) {
+                    console.error("Lỗi lưu ghi chú:", err);
+                    if (noteStatus) {
+                        noteStatus.innerHTML = '<i class="fas fa-exclamation-circle mr-1"></i>Lỗi khi lưu';
+                        noteStatus.classList.remove('text-gray-500');
+                        noteStatus.classList.add('text-red-500');
+                    }
+                }
+            }, 600);
+        });
+    }
 }
 
 // === CHUYỂN VỀ CÂU HỎI TRƯỚC ===
@@ -448,6 +775,9 @@ function showPreviousQuestion() {
 // === KẾT THÚC BÀI KIỂM TRA ===
 function endQuiz() {
     showSubmitQuizBtn(false); // Ẩn nút nộp bài khi kết thúc
+    if (focusMode) {
+        toggleFocusMode();
+    }
 
     // Nếu là chế độ không xem đáp án ngay, sau khi kết thúc mới tính điểm và hiện đúng/sai cho từng đáp án
     if (!quizOptions.showAnswerImmediately) {
@@ -633,8 +963,11 @@ function showResults(totalTime) {
             </div>
         </div>
     `;
+    renderMath(resultsSection);
     document.getElementById('restartQuizBtn').addEventListener('click', () => {
         clearQuizState(); // Xóa trạng thái khi làm lại
+        streak = 0;
+        used5050Questions = {};
         // Khi làm lại, vẫn tôn trọng các tùy chọn đã chọn ban đầu
         let questionsToRestart = [...originalQuestions];
         const shouldShuffle = document.getElementById('shuffle-questions-checkbox')?.checked || false;
@@ -836,6 +1169,10 @@ function handleAnswerClick(e) {
     const isCorrect = selectedIdx === questions[currentIndex].correctAnswerIndex;
     if (isCorrect) {
         score++;
+        streak++;
+        triggerConfetti();
+    } else {
+        streak = 0;
     }
 
     // Vô hiệu hóa và hiển thị kết quả cho tất cả các nút đáp án
@@ -917,6 +1254,37 @@ function shuffleArray(array) {
 if (startFlashcardBtn) {
     startFlashcardBtn.addEventListener('click', startFlashcardMode);
 }
+
+    // --- Lắng nghe sự kiện bàn phím để chuyển câu (Phím mũi tên) ---
+    document.addEventListener('keydown', (e) => {
+        // Chỉ hoạt động khi đang làm trắc nghiệm (quizContainer hiển thị và resultsSection ẩn)
+        const quizContainerElement = document.getElementById('quiz-container');
+        const resultsSectionElement = document.getElementById('resultsSection');
+        if (!quizContainerElement || quizContainerElement.classList.contains('hidden')) return;
+        if (resultsSectionElement && !resultsSectionElement.classList.contains('hidden')) return;
+
+        // Tránh kích hoạt khi người dùng đang gõ vào ô nhập liệu
+        if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+
+        if (e.key === 'ArrowLeft') {
+            // Câu trước: chỉ cho phép lùi lại nếu currentIndex > 0 và không phải chế độ practice
+            if (currentIndex > 0 && quizMode !== 'practice') {
+                e.preventDefault();
+                showPreviousQuestion();
+            }
+        } else if (e.key === 'ArrowRight') {
+            // Câu tiếp: chỉ cho phép tiến nếu currentIndex < questions.length - 1
+            // và đã chọn câu trả lời (ở chế độ hiện ngay) hoặc ở chế độ ẩn đáp án
+            if (currentIndex < questions.length - 1) {
+                const hasAnswered = userAnswers[currentIndex] !== null;
+                const showImmediately = quizOptions.showAnswerImmediately;
+                if (!showImmediately || hasAnswered) {
+                    e.preventDefault();
+                    showNextQuestion();
+                }
+            }
+        }
+    });
 
 // Tải dữ liệu bộ đề ngay khi trang được tải
 loadQuizData();
