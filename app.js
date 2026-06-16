@@ -1,7 +1,7 @@
 // File: app.js
 import { auth, db } from './firebase-init.js';
 import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-auth.js";
-import { doc, setDoc, collection, addDoc, query, where, getDocs, getDoc, orderBy, limit, deleteDoc, updateDoc, runTransaction, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js";
+import { doc, setDoc, collection, addDoc, query, where, getDocs, getDoc, orderBy, limit, deleteDoc, updateDoc, runTransaction, serverTimestamp, startAfter } from "https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore.js";
 import { showToast } from './utils.js';
 import { achievements, checkAndAwardAchievement } from './achievements.js';
 
@@ -43,6 +43,13 @@ let selectedFolderIcon = 'fa-folder';
 let selectedFolderColor = 'amber';
 let isSelectionMode = false;
 let selectedQuizIds = [];
+
+// Biến quản lý phân trang và tải ngầm
+let pageCursors = [null];
+let currentLibraryPage = 1;
+let totalLibraryPages = 1;
+let isLibraryFullyLoaded = false;
+let hasMoreLibraryPages = false;
 let isBulkMoving = false;
 const FOLDER_COLORS = {
     amber: {
@@ -320,7 +327,8 @@ async function saveAndStartQuiz() {
             questionCount: questions.length,
             questions: questions,
             createdAt: new Date(),
-            isPublic: true // Luôn public bộ đề
+            isPublic: true, // Luôn public bộ đề
+            folderId: currentFolderId || null
         });
         console.log('DEBUG: Quiz saved with ID:', docRef.id);
         await checkCreationAchievements(user.uid);
@@ -352,7 +360,8 @@ async function saveOnly() {
             questionCount: questions.length,
             questions: questions,
             createdAt: new Date(),
-            isPublic: true // Luôn public bộ đề
+            isPublic: true, // Luôn public bộ đề
+            folderId: currentFolderId || null
         });
         await checkCreationAchievements(user.uid);
         showToast(`Đã lưu "${currentQuizTitle}" vào thư viện!`, 'success');
@@ -491,11 +500,48 @@ if (searchModeQuiz && searchModeQuestion) {
     searchModeQuiz.addEventListener('change', handleLibrarySearch);
     searchModeQuestion.addEventListener('change', handleLibrarySearch);
 }
+
+// Đồng bộ Segmented Control trên Mobile
+const modeQuizBtn = document.getElementById('search-mode-quiz-btn');
+const modeQuestionBtn = document.getElementById('search-mode-question-btn');
+
+if (modeQuizBtn && modeQuestionBtn) {
+    const updateSegmentedUI = (activeMode) => {
+        if (activeMode === 'quiz') {
+            modeQuizBtn.className = 'flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all duration-200 bg-white text-pink-600 shadow-sm flex items-center justify-center gap-1.5 focus:outline-none';
+            modeQuestionBtn.className = 'flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all duration-200 text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1.5 focus:outline-none';
+            librarySearchInput.placeholder = 'Tìm kiếm bộ đề...';
+        } else {
+            modeQuizBtn.className = 'flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all duration-200 text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1.5 focus:outline-none';
+            modeQuestionBtn.className = 'flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all duration-200 bg-white text-pink-600 shadow-sm flex items-center justify-center gap-1.5 focus:outline-none';
+            librarySearchInput.placeholder = 'Tìm kiếm câu hỏi...';
+        }
+    };
+
+    modeQuizBtn.addEventListener('click', () => {
+        if (searchModeQuiz) {
+            searchModeQuiz.checked = true;
+            searchModeQuiz.dispatchEvent(new Event('change'));
+            updateSegmentedUI('quiz');
+        }
+    });
+    
+    modeQuestionBtn.addEventListener('click', () => {
+        if (searchModeQuestion) {
+            searchModeQuestion.checked = true;
+            searchModeQuestion.dispatchEvent(new Event('change'));
+            updateSegmentedUI('question');
+        }
+    });
 }
-async function loadAndDisplayLibrary() {
+}
+async function loadAndDisplayLibrary(page = 1) {
+    if (typeof page !== 'number') {
+        page = 1;
+    }
     const user = auth.currentUser;
     const quizListContainer = document.getElementById('quiz-list-container');
-    quizListContainer.innerHTML = `<div class="text-gray-500">Đang tải...</div>`;
+    if (!quizListContainer) return;
 
     if (!user) {
         quizListContainer.innerHTML = '<p>Vui lòng <a href="#" id="login-link" class="text-[#FF69B4] underline">đăng nhập</a>.</p>';
@@ -503,42 +549,43 @@ async function loadAndDisplayLibrary() {
         return;
     }
 
-    try {
-        // Tự động di cư thư mục từ localStorage lên Firestore nếu có
-        const localFoldersKey = `quiz_folders_${user.uid}`;
-        const localFolders = JSON.parse(localStorage.getItem(localFoldersKey) || '[]');
-        if (localFolders.length > 0) {
-            try {
-                for (const folder of localFolders) {
-                    const folderDocRef = doc(db, "quiz_folders", folder.id);
-                    await setDoc(folderDocRef, {
-                        userId: user.uid,
-                        name: folder.name,
-                        color: folder.color,
-                        icon: folder.icon,
-                        createdAt: folder.createdAt || new Date().toISOString()
-                      });
-                }
-                localStorage.removeItem(localFoldersKey);
-                if (typeof showToast === 'function') showToast('Đã đồng bộ thư mục cũ lên đám mây!', 'success');
-            } catch (migrationErr) {
-                console.warn("Chưa thể đồng bộ thư mục cũ (có thể do Firebase Rules chưa cập nhật):", migrationErr);
-            }
-        }
+    currentLibraryPage = page;
 
-        // Tải danh sách thư mục từ Firestore
+    // Nếu đã tải xong toàn bộ dữ liệu ở background, ta chỉ cần render từ cache
+    if (isLibraryFullyLoaded) {
+        renderBreadcrumb();
+        renderLibrary(userQuizSets, currentLibraryPage);
+        return;
+    }
+
+    // Hiển thị loading spinner ở lần đầu tiên vào thư viện
+    if (page === 1) {
+        quizListContainer.innerHTML = `<div class="text-gray-500 col-span-full text-center py-6"><i class="fas fa-spinner fa-spin mr-2"></i>Đang tải thư viện...</div>`;
+    }
+
+    try {
+        // Tải danh sách thư mục từ Firestore (giữ nguyên vì số lượng thư mục ít)
         const qFolders = query(collection(db, "quiz_folders"), where("userId", "==", user.uid));
         const querySnapshotFolders = await getDocs(qFolders);
         userFolders = querySnapshotFolders.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         userFolders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-        // Tải bộ đề từ Firestore
-        const q = query(collection(db, "quiz_sets"), where("userId", "==", user.uid), orderBy("createdAt", "desc"));
+        // Tải nhanh 13 bộ đề mới nhất của user (không filter folderId ở server để dùng index có sẵn, tránh composite index mới)
+        const q = query(
+            collection(db, "quiz_sets"),
+            where("userId", "==", user.uid),
+            orderBy("createdAt", "desc"),
+            limit(13)
+        );
+
         const querySnapshot = await getDocs(q);
-        userQuizSets = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })); // Giữ lại biến cache nhưng không dùng cho tìm kiếm
-        
+        const pageQuizzes = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
         renderBreadcrumb();
-        renderLibrary(userQuizSets);
+        renderLibrary(pageQuizzes, 1);
+
+        // Kích hoạt tải ngầm toàn bộ dữ liệu để phục vụ tìm kiếm/cache và phân trang hoàn chỉnh
+        loadAllLibraryInBackground(user.uid);
 
     } catch (e) {
         console.error("Lỗi tải thư viện: ", e);
@@ -546,7 +593,35 @@ async function loadAndDisplayLibrary() {
     }
 }
 
+async function loadAllLibraryInBackground(userId) {
+    try {
+        const q = query(collection(db, "quiz_sets"), where("userId", "==", userId));
+        const querySnapshot = await getDocs(q);
+        userQuizSets = querySnapshot.docs.map(doc => {
+            const data = doc.data();
+            // Tự động gán folderId: null cho các bộ đề cũ chưa có thuộc tính này
+            if (data.folderId === undefined) {
+                updateDoc(doc.ref, { folderId: null }).catch(err => {
+                    console.warn(`Lỗi tự động cập nhật folderId cho bộ đề ${doc.id}:`, err);
+                });
+                return { id: doc.id, ...data, folderId: null };
+            }
+            return { id: doc.id, ...data };
+        });
+        isLibraryFullyLoaded = true;
+        console.log("Đã tải xong toàn bộ thư viện dưới background và tự động cập nhật các bộ đề cũ.");
+        
+        // Render lại danh sách đầy đủ từ cache
+        renderLibrary(userQuizSets, currentLibraryPage);
+    } catch (err) {
+        console.error("Lỗi tải thư viện chạy ngầm: ", err);
+    }
+}
+
 function renderLibrary(quizzesToDisplay, page = 1) {
+    if (typeof page !== 'number') {
+        page = 1;
+    }
     const quizListContainer = document.getElementById('quiz-list-container');
     quizListContainer.innerHTML = '';
 
@@ -560,100 +635,137 @@ function renderLibrary(quizzesToDisplay, page = 1) {
         );
     }
 
-    // Nếu không tìm kiếm và ở Root, ta vẽ thêm danh sách thư mục lên trên cùng
-    if (!isSearching && currentFolderId === null) {
-        userFolders.forEach((folder) => {
-            const card = document.createElement('div');
-            const colorVal = folder.color || 'amber';
-            const iconClass = folder.icon || 'fa-folder';
-            const count = quizzesToDisplay.filter(q => q.folderId === folder.id).length;
+    const foldersSection = document.getElementById('folders-section');
+    const foldersContainer = document.getElementById('folders-container');
+    const quizzesSectionTitle = document.getElementById('quizzes-section-title');
 
-            if (colorVal.startsWith('#')) {
-                // Sử dụng inline style cho màu Hex custom
-                card.style.backgroundColor = `${colorVal}14`; // ~8% opacity
-                card.style.borderColor = `${colorVal}33`; // ~20% opacity
-                card.className = 'rounded-xl p-4 flex flex-col justify-between cursor-pointer shadow-sm hover:shadow transition relative border';
-                
-                // Hiệu ứng hover đổi màu nền mịn màng động
-                card.addEventListener('mouseenter', () => {
-                    card.style.backgroundColor = `${colorVal}26`; // ~15% opacity
-                });
-                card.addEventListener('mouseleave', () => {
-                    card.style.backgroundColor = `${colorVal}14`; // ~8% opacity
-                });
+    // Ẩn/Hiện section thư mục và tiêu đề phần bộ đề
+    const showFolders = !isSearching && currentFolderId === null && userFolders.length > 0;
+    if (foldersSection) {
+        if (showFolders) foldersSection.classList.remove('hidden');
+        else foldersSection.classList.add('hidden');
+    }
+    if (quizzesSectionTitle) {
+        if (showFolders) quizzesSectionTitle.classList.remove('hidden');
+        else quizzesSectionTitle.classList.add('hidden');
+    }
+
+    // Render danh sách thư mục cuộn ngang nếu ở Root và không tìm kiếm
+    if (foldersContainer) {
+        foldersContainer.innerHTML = '';
+        if (!isSearching && currentFolderId === null) {
+            userFolders.forEach((folder) => {
+                const card = document.createElement('div');
+                const colorVal = folder.color || 'amber';
+                const iconClass = folder.icon || 'fa-folder';
+                const count = userQuizSets.filter(q => q.folderId === folder.id).length;
+
+                card.className = 'folder-mini-card';
+                card.setAttribute('data-id', folder.id);
+
+                let bgStyle = '';
+                let iconStyle = '';
+                if (colorVal.startsWith('#')) {
+                    bgStyle = `style="border-color: ${colorVal}33; background-color: ${colorVal}08;"`;
+                    iconStyle = `style="background-color: ${colorVal}1a; color: ${colorVal};"`;
+                } else {
+                    const theme = FOLDER_COLORS[colorVal] || FOLDER_COLORS['amber'];
+                    card.classList.add(`border-${colorVal}-100`);
+                    card.style.backgroundColor = `var(--tw-bg-opacity)`; // fallback
+                    iconStyle = `class="folder-icon-wrapper ${theme.iconBg}"`;
+                }
+
+                // Nếu là mã màu hex, dùng inline style, ngược lại dùng theme class
+                const wrapperHTML = colorVal.startsWith('#') 
+                    ? `<div class="folder-icon-wrapper" ${iconStyle}><i class="fas ${iconClass}"></i></div>`
+                    : `<div ${iconStyle}><i class="fas ${iconClass}"></i></div>`;
 
                 card.innerHTML = `
-                    <div class="flex items-center gap-3 folder-click-area">
-                        <div class="p-3 rounded-xl text-2xl flex-shrink-0 flex items-center justify-center w-12 h-12" style="background-color: ${colorVal}26; color: ${colorVal};">
-                            <i class="fas ${iconClass}"></i>
-                        </div>
-                        <div class="flex-grow">
-                            <h3 class="font-bold text-gray-700 text-base line-clamp-1">${folder.name}</h3>
+                    <div class="folder-mini-card-content folder-click-area">
+                        ${wrapperHTML}
+                        <div class="min-w-0">
+                            <h4 class="font-bold text-gray-800 text-sm truncate" title="${folder.name}">${folder.name}</h4>
                             <p class="text-xs text-gray-500 mt-0.5">${count} bộ đề</p>
                         </div>
                     </div>
-                    <button class="folder-menu-btn absolute top-3 right-3 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-pink-500 focus:outline-none" data-id="${folder.id}"><i class="fas fa-ellipsis-h"></i></button>
-                    <div class="folder-menu hidden absolute top-10 right-3 bg-white rounded-lg shadow-lg border border-pink-100 z-20 min-w-[120px]">
-                        <button class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-pink-50 rename-folder-btn" data-id="${folder.id}" data-name="${folder.name}"><i class="fas fa-edit mr-2 text-blue-400"></i>Đổi tên</button>
-                        <button class="block w-full text-left px-4 py-2 text-red-700 hover:bg-pink-50 delete-folder-btn" data-id="${folder.id}"><i class="fas fa-trash-alt mr-2 text-red-400"></i>Xóa</button>
-                    </div>
-                `;
-            } else {
-                // Sử dụng FOLDER_COLORS tĩnh
-                const theme = FOLDER_COLORS[colorVal] || FOLDER_COLORS['amber'];
-                card.className = `rounded-xl p-4 flex flex-col justify-between cursor-pointer shadow-sm hover:shadow transition relative border ${theme.bg}`;
-                card.innerHTML = `
-                    <div class="flex items-center gap-3 folder-click-area">
-                        <div class="p-3 rounded-xl text-2xl flex-shrink-0 flex items-center justify-center w-12 h-12 ${theme.iconBg}">
-                            <i class="fas ${iconClass}"></i>
-                        </div>
-                        <div class="flex-grow">
-                            <h3 class="font-bold text-gray-700 text-base line-clamp-1">${folder.name}</h3>
-                            <p class="text-xs text-gray-500 mt-0.5">${count} bộ đề</p>
+                    <div class="relative flex items-center">
+                        <button class="folder-menu-btn w-6 h-6 flex items-center justify-center text-gray-400 hover:text-pink-500 rounded-full focus:outline-none" data-id="${folder.id}"><i class="fas fa-ellipsis-v text-xs"></i></button>
+                        <div class="folder-menu hidden absolute right-0 top-7 bg-white rounded-lg shadow-lg border border-pink-100 z-30 min-w-[120px]">
+                            <button class="block w-full text-left px-4 py-2 text-xs text-gray-700 hover:bg-pink-50 rename-folder-btn" data-id="${folder.id}" data-name="${folder.name}"><i class="fas fa-edit mr-2 text-blue-400"></i>Đổi tên</button>
+                            <button class="block w-full text-left px-4 py-2 text-xs text-red-700 hover:bg-pink-50 delete-folder-btn" data-id="${folder.id}"><i class="fas fa-trash-alt mr-2 text-red-400"></i>Xóa</button>
                         </div>
                     </div>
-                    <button class="folder-menu-btn absolute top-3 right-3 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-pink-500 focus:outline-none" data-id="${folder.id}"><i class="fas fa-ellipsis-h"></i></button>
-                    <div class="folder-menu hidden absolute top-10 right-3 bg-white rounded-lg shadow-lg border border-pink-100 z-20 min-w-[120px]">
-                        <button class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-pink-50 rename-folder-btn" data-id="${folder.id}" data-name="${folder.name}"><i class="fas fa-edit mr-2 text-blue-400"></i>Đổi tên</button>
-                        <button class="block w-full text-left px-4 py-2 text-red-700 hover:bg-pink-50 delete-folder-btn" data-id="${folder.id}"><i class="fas fa-trash-alt mr-2 text-red-400"></i>Xóa</button>
-                    </div>
                 `;
-            }
-            
-            // Xử lý sự kiện mở thư mục
-            card.querySelector('.folder-click-area').addEventListener('click', () => {
-                currentFolderId = folder.id;
-                renderBreadcrumb();
-                renderLibrary(quizzesToDisplay);
-            });
 
-            // Xử lý sự kiện mở menu thư mục
-            const menuBtn = card.querySelector('.folder-menu-btn');
-            const menu = card.querySelector('.folder-menu');
-            menuBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                document.querySelectorAll('.quiz-menu, .folder-menu').forEach(m => {
-                    if (m !== menu) m.classList.add('hidden');
+                // Xử lý sự kiện mở thư mục
+                card.querySelector('.folder-click-area').addEventListener('click', () => {
+                    currentFolderId = folder.id;
+                    renderBreadcrumb();
+                    loadAndDisplayLibrary(1);
                 });
-                menu.classList.toggle('hidden');
-            });
 
-            // Đổi tên thư mục
-            card.querySelector('.rename-folder-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                menu.classList.add('hidden');
-                openFolderModal('edit', folder.id, folder.name);
-            });
+                // Xử lý sự kiện mở menu thư mục
+                const menuBtn = card.querySelector('.folder-menu-btn');
+                const menu = card.querySelector('.folder-menu');
+                menuBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    document.querySelectorAll('.quiz-menu, .folder-menu').forEach(m => {
+                        if (m !== menu) m.classList.add('hidden');
+                    });
+                    menu.classList.toggle('hidden');
+                });
 
-            // Xóa thư mục
-            card.querySelector('.delete-folder-btn').addEventListener('click', (e) => {
-                e.stopPropagation();
-                menu.classList.add('hidden');
-                confirmDeleteFolder(folder.id);
-            });
+                // Đổi tên thư mục
+                card.querySelector('.rename-folder-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    menu.classList.add('hidden');
+                    openFolderModal('edit', folder.id, folder.name);
+                });
 
-            quizListContainer.appendChild(card);
-        });
+                // Xóa thư mục
+                card.querySelector('.delete-folder-btn').addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    menu.classList.add('hidden');
+                    confirmDeleteFolder(folder.id);
+                });
+
+                // Thêm sự kiện Drag & Drop cho folder
+                card.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    e.dataTransfer.dropEffect = 'move';
+                });
+                card.addEventListener('dragenter', (e) => {
+                    e.preventDefault();
+                    card.classList.add('border-pink-500', 'bg-pink-50/20');
+                });
+                card.addEventListener('dragleave', () => {
+                    card.classList.remove('border-pink-500', 'bg-pink-50/20');
+                });
+                card.addEventListener('drop', async (e) => {
+                    e.preventDefault();
+                    card.classList.remove('border-pink-500', 'bg-pink-50/20');
+                    const quizId = e.dataTransfer.getData('text/plain');
+                    if (!quizId) return;
+                    
+                    try {
+                        isLibraryFullyLoaded = false;
+                        const quizDocRef = doc(db, "quiz_sets", quizId);
+                        await updateDoc(quizDocRef, { folderId: folder.id });
+                        if (typeof showToast === 'function') {
+                            showToast(`Đã chuyển bộ đề vào thư mục "${folder.name}"!`, 'success');
+                        }
+                        await loadAndDisplayLibrary();
+                    } catch (err) {
+                        console.error("Lỗi kéo thả di chuyển bộ đề:", err);
+                        if (typeof showToast === 'function') {
+                            showToast('Có lỗi xảy ra khi di chuyển bộ đề!', 'error');
+                        }
+                    }
+                });
+
+                foldersContainer.appendChild(card);
+            });
+        }
     }
 
     if (filteredQuizzes.length === 0 && (!userFolders.length || currentFolderId !== null || isSearching)) {
@@ -665,62 +777,110 @@ function renderLibrary(quizzesToDisplay, page = 1) {
     }
 
     const ITEMS_PER_PAGE = 12;
-    const totalPages = Math.ceil(filteredQuizzes.length / ITEMS_PER_PAGE);
+    let totalPages = 1;
     let currentPage = page;
-    if (currentPage > totalPages) currentPage = totalPages;
-    if (currentPage < 1) currentPage = 1;
 
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    const currentQuizzes = filteredQuizzes.slice(startIndex, endIndex);
+    if (isLibraryFullyLoaded || isSearching) {
+        // Phân trang Client-side khi đã tải đầy đủ cache hoặc khi tìm kiếm
+        totalPages = Math.ceil(filteredQuizzes.length / ITEMS_PER_PAGE) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
 
-    currentQuizzes.forEach((quizSet) => {
+        const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+        const endIndex = startIndex + ITEMS_PER_PAGE;
+        filteredQuizzes = filteredQuizzes.slice(startIndex, endIndex);
+    } else {
+        // Lần đầu tải nhanh (chưa load xong background), chỉ hiển thị tạm tối đa 12 bộ đề
+        totalPages = 1;
+        currentPage = 1;
+        filteredQuizzes = filteredQuizzes.slice(0, ITEMS_PER_PAGE);
+    }
+
+    filteredQuizzes.forEach((quizSet) => {
         const card = document.createElement('div');
         const isSelected = selectedQuizIds.includes(quizSet.id);
         
-        let cardClass = 'bg-white rounded-lg shadow-md p-4 flex flex-col transition relative';
+        let cardClass = 'bg-white rounded-2xl border border-gray-100 p-5 shadow-sm hover:-translate-y-1 hover:shadow-md hover:border-pink-200 transition-all duration-300 flex flex-col relative';
         if (isSelectionMode) {
             cardClass = isSelected 
-                ? 'bg-white rounded-lg shadow-md p-4 flex flex-col cursor-pointer border-2 border-pink-500 bg-pink-50/20 transition relative'
-                : 'bg-white rounded-lg shadow-md p-4 flex flex-col cursor-pointer border border-pink-100 transition relative';
+                ? 'bg-pink-50/20 rounded-2xl border-2 border-pink-500 p-5 shadow-md flex flex-col cursor-pointer transition-all duration-300 relative'
+                : 'bg-white rounded-2xl border border-pink-100 p-5 shadow-sm flex flex-col cursor-pointer hover:border-pink-300 transition-all duration-300 relative';
         }
         card.className = cardClass;
         card.setAttribute('data-id', quizSet.id);
 
+        const dateStr = quizSet.createdAt && quizSet.createdAt.toDate ? new Date(quizSet.createdAt.toDate()).toLocaleDateString('vi-VN') : 'N/A';
+        
         let checkboxHTML = '';
         let menuHTML = '';
         if (isSelectionMode) {
             checkboxHTML = `
-                <div class="absolute top-3 left-3 z-10">
-                    <input type="checkbox" class="bulk-quiz-checkbox w-5 h-5 rounded border-pink-300 text-[#FF69B4] focus:ring-pink-300 cursor-pointer pointer-events-none" ${isSelected ? 'checked' : ''} />
+                <div class="absolute top-4 left-4 z-10">
+                    <input type="checkbox" class="bulk-quiz-checkbox w-5 h-5 rounded-full border-pink-300 text-[#FF69B4] focus:ring-pink-300 cursor-pointer pointer-events-none" ${isSelected ? 'checked' : ''} />
                 </div>
             `;
         } else {
             menuHTML = `
-                <button class="quiz-menu-btn absolute top-2 right-2 w-8 h-8 flex items-center justify-center text-gray-400 hover:text-pink-500 focus:outline-none" data-id="${quizSet.id}" title="Tuỳ chọn"><i class="fas fa-ellipsis-h"></i></button>
-                <div class="quiz-menu hidden absolute top-10 right-2 bg-white rounded-lg shadow-lg border border-pink-100 z-20 min-w-[160px]">
-                    <button class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-pink-50 quiz-history-btn" data-id="${quizSet.id}"><i class="fas fa-history mr-2 text-pink-400"></i>Xem lịch sử làm bài</button>
-                    <button class="block w-full text-left px-4 py-2 text-blue-700 hover:bg-pink-50 edit-quiz-content-btn" data-id="${quizSet.id}"><i class="fas fa-pen-alt mr-2 text-blue-400"></i>Sửa câu hỏi</button>
-                    <button class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-pink-50 edit-quiz-btn" data-id="${quizSet.id}" data-title="${quizSet.title}"><i class="fas fa-edit mr-2 text-blue-400"></i>Sửa tên</button>
-                    <button class="block w-full text-left px-4 py-2 text-gray-700 hover:bg-pink-50 move-quiz-btn" data-id="${quizSet.id}"><i class="fas fa-folder-open mr-2 text-yellow-500"></i>Di chuyển thư mục</button>
-                    <button class="block w-full text-left px-4 py-2 text-green-700 hover:bg-pink-50 share-quiz-btn" data-id="${quizSet.id}"><i class="fas fa-share-alt mr-2 text-green-400"></i>Chia sẻ</button>
-                    <button class="block w-full text-left px-4 py-2 text-red-700 hover:bg-pink-50 delete-quiz-btn" data-id="${quizSet.id}"><i class="fas fa-trash-alt mr-2 text-red-400"></i>Xóa</button>
+                <div class="absolute top-4 right-4">
+                    <button class="quiz-menu-btn w-8 h-8 flex items-center justify-center text-gray-400 hover:text-pink-500 hover:bg-pink-50 rounded-full focus:outline-none transition-colors" data-id="${quizSet.id}" title="Tùy chọn"><i class="fas fa-ellipsis-v"></i></button>
+                    <div class="quiz-menu hidden absolute right-0 top-9 bg-white rounded-xl shadow-xl border border-gray-100 z-20 min-w-[175px] py-1.5 animate-in fade-in slide-in-from-top-2 duration-150">
+                        <button class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 quiz-history-btn" data-id="${quizSet.id}"><i class="fas fa-history mr-2.5 text-pink-400"></i>Xem lịch sử làm bài</button>
+                        <button class="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-pink-50 move-quiz-btn" data-id="${quizSet.id}"><i class="fas fa-folder-open mr-2.5 text-yellow-500"></i>Di chuyển</button>
+                        <div class="border-t border-gray-100 my-1"></div>
+                        <button class="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 delete-quiz-btn" data-id="${quizSet.id}"><i class="fas fa-trash-alt mr-2.5 text-red-500"></i>Xóa bộ đề</button>
+                    </div>
                 </div>
             `;
         }
 
         card.innerHTML = `
             ${checkboxHTML}
-            <div class="flex-grow relative ${isSelectionMode ? 'pl-8' : ''}">
-                <h3 class="text-md font-bold text-gray-700">${quizSet.title}</h3>
-                <p class="text-sm text-gray-500 mt-2">${quizSet.questionCount} câu hỏi</p>
-                <p class="text-xs text-gray-400 mt-1">Lưu ngày: ${new Date(quizSet.createdAt.toDate()).toLocaleDateString()}</p>
+            <div class="flex-grow ${isSelectionMode ? 'pl-8' : ''}">
+                <h3 class="text-base font-bold text-gray-800 line-clamp-2 pr-8 mb-3" title="${quizSet.title}">
+                    ${quizSet.title}
+                </h3>
+                <div class="flex flex-wrap gap-2 mb-4">
+                    <span class="bg-pink-50 text-pink-600 px-2.5 py-1 rounded-full text-xs font-semibold inline-flex items-center gap-1.5">
+                        <i class="fas fa-question-circle text-xs opacity-80"></i>
+                        ${quizSet.questionCount} câu hỏi
+                    </span>
+                    <span class="bg-gray-50 text-gray-500 px-2.5 py-1 rounded-full text-xs inline-flex items-center gap-1.5">
+                        <i class="far fa-calendar-alt text-xs opacity-80"></i>
+                        ${dateStr}
+                    </span>
+                </div>
                 ${menuHTML}
             </div>
-            <div class="mt-4 flex flex-col gap-2 ${isSelectionMode ? 'opacity-40 pointer-events-none' : ''}">
-                <a href="quiz.html?id=${quizSet.id}" class="w-full text-center px-4 py-3 bg-[#FF69B4] text-white rounded-lg hover:bg-opacity-80 transition text-lg font-bold">Bắt đầu</a>
+            <div class="mt-auto pt-3 border-t border-gray-50 flex justify-between items-center ${isSelectionMode ? 'opacity-40 pointer-events-none' : ''}">
+                <div class="flex items-center gap-1">
+                    <button class="edit-quiz-content-btn w-8 h-8 flex items-center justify-center text-gray-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors" data-id="${quizSet.id}" title="Sửa câu hỏi">
+                        <i class="fas fa-pen-alt text-sm"></i>
+                    </button>
+                    <button class="edit-quiz-btn w-8 h-8 flex items-center justify-center text-gray-400 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-colors" data-id="${quizSet.id}" data-title="${quizSet.title}" title="Sửa tên">
+                        <i class="fas fa-edit text-sm"></i>
+                    </button>
+                    <button class="share-quiz-btn w-8 h-8 flex items-center justify-center text-gray-400 hover:text-green-500 hover:bg-green-50 rounded-lg transition-colors" data-id="${quizSet.id}" title="Chia sẻ">
+                        <i class="fas fa-share-alt text-sm"></i>
+                    </button>
+                </div>
+                <a href="quiz.html?id=${quizSet.id}" class="inline-flex items-center justify-center px-4 py-2 bg-gradient-to-r from-pink-500 to-rose-400 hover:from-pink-600 hover:to-rose-500 text-white rounded-xl hover:shadow-lg hover:shadow-pink-100 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-200 text-xs font-bold gap-1.5">
+                    Luyện tập <i class="fas fa-play text-[10px]"></i>
+                </a>
             </div>
         `;
+
+        // Thêm sự kiện Drag & Drop cho bộ đề
+        if (!isSelectionMode) {
+            card.setAttribute('draggable', 'true');
+            card.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('text/plain', quizSet.id);
+                e.dataTransfer.effectAllowed = 'move';
+                setTimeout(() => card.classList.add('opacity-40'), 0);
+            });
+            card.addEventListener('dragend', () => {
+                card.classList.remove('opacity-40');
+            });
+        }
         
         quizListContainer.appendChild(card);
 
@@ -736,11 +896,11 @@ function renderLibrary(quizzesToDisplay, page = 1) {
             
             if (hasId) {
                 selectedQuizIds = selectedQuizIds.filter(id => id !== quizSet.id);
-                card.className = 'bg-white rounded-lg shadow-md p-4 flex flex-col cursor-pointer border border-pink-100 transition relative';
+                card.className = 'bg-white rounded-2xl border border-pink-100 p-5 shadow-sm flex flex-col cursor-pointer hover:border-pink-300 transition-all duration-300 relative';
                 if (checkbox) checkbox.checked = false;
             } else {
                 selectedQuizIds.push(quizSet.id);
-                card.className = 'bg-white rounded-lg shadow-md p-4 flex flex-col cursor-pointer border-2 border-pink-500 bg-pink-50/20 transition relative';
+                card.className = 'bg-pink-50/20 rounded-2xl border-2 border-pink-500 p-5 shadow-md flex flex-col cursor-pointer transition-all duration-300 relative';
                 if (checkbox) checkbox.checked = true;
             }
             updateBulkActionsToolbar();
@@ -802,19 +962,7 @@ function renderLibrary(quizzesToDisplay, page = 1) {
                 shareBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
                     const quizId = this.getAttribute('data-id');
-                    const url = `${window.location.origin}/quiz.html?id=${quizId}`;
-                    if (navigator.share) {
-                        navigator.share({
-                            title: 'Chia sẻ bộ đề',
-                            url: url
-                        }).catch(()=>{});
-                    } else if (navigator.clipboard) {
-                        navigator.clipboard.writeText(url);
-                        if (typeof showToast === 'function') showToast('Đã copy link bộ đề!', 'success');
-                        else alert('Đã copy link bộ đề: ' + url);
-                    } else {
-                        alert('Link bộ đề: ' + url);
-                    }
+                    openShareQuizModal(quizId, quizSet.title);
                 });
             }
 
@@ -830,7 +978,7 @@ function renderLibrary(quizzesToDisplay, page = 1) {
         }, 0);
     });
 
-    renderLibraryPagination(filteredQuizzes, currentPage, totalPages);
+    renderLibraryPagination(isSearching ? quizzesToDisplay : (isLibraryFullyLoaded ? quizzesToDisplay : filteredQuizzes), currentPage, totalPages);
 }
 
 function renderLibraryPagination(quizzesToDisplay, currentPage, totalPages) {
@@ -844,6 +992,14 @@ function renderLibraryPagination(quizzesToDisplay, currentPage, totalPages) {
         if (quizListContainer && quizListContainer.parentNode) {
             quizListContainer.parentNode.insertBefore(paginationContainer, quizListContainer.nextSibling);
         }
+    }
+
+    const isSearching = document.getElementById('library-search-input')?.value.trim() !== '';
+
+    // Nếu chưa tải xong cache và không tìm kiếm, tạm thời ẩn phân trang để tránh lỗi
+    if (!isLibraryFullyLoaded && !isSearching) {
+        paginationContainer.innerHTML = '';
+        return;
     }
 
     if (totalPages <= 1) {
@@ -862,11 +1018,15 @@ function renderLibraryPagination(quizzesToDisplay, currentPage, totalPages) {
     `;
 
     document.getElementById('lib-prev-page').addEventListener('click', () => {
-        if (currentPage > 1) renderLibrary(quizzesToDisplay, currentPage - 1);
+        if (currentPage > 1) {
+            renderLibrary(quizzesToDisplay, currentPage - 1);
+        }
     });
 
     document.getElementById('lib-next-page').addEventListener('click', () => {
-        if (currentPage < totalPages) renderLibrary(quizzesToDisplay, currentPage + 1);
+        if (currentPage < totalPages) {
+            renderLibrary(quizzesToDisplay, currentPage + 1);
+        }
     });
 }
 
@@ -874,6 +1034,7 @@ function renderLibraryPagination(quizzesToDisplay, currentPage, totalPages) {
 async function deleteQuizSet(quizId) {
     if (confirm("Bạn có chắc muốn xóa bộ đề này? Hành động này không thể hoàn tác.")) {
         try {
+            isLibraryFullyLoaded = false;
             await deleteDoc(doc(db, "quiz_sets", quizId));
             showToast("Đã xóa bộ đề thành công!", 'success');
             loadAndDisplayLibrary(); // Tải lại thư viện để cập nhật giao diện
@@ -889,6 +1050,7 @@ async function editQuizSetTitle(quizId, currentTitle) {
     const newTitle = prompt("Nhập tên mới cho bộ đề:", currentTitle);
     if (newTitle && newTitle.trim() !== '') {
         const docRef = doc(db, "quiz_sets", quizId);
+        isLibraryFullyLoaded = false;
         await updateDoc(docRef, { title: newTitle.trim() });
         showToast('Đã cập nhật tên bộ đề!', 'success');
         loadAndDisplayLibrary();
@@ -1709,7 +1871,7 @@ function setupEventListeners() {
                 cb.checked = true;
                 const cardEl = cb.closest('[data-id]');
                 if (cardEl) {
-                    cardEl.className = 'bg-white rounded-lg shadow-md p-4 flex flex-col cursor-pointer border-2 border-pink-500 bg-pink-50/20 transition relative';
+                    cardEl.className = 'bg-pink-50/20 rounded-2xl border-2 border-pink-500 p-5 shadow-md flex flex-col cursor-pointer transition-all duration-300 relative';
                 }
             });
             updateBulkActionsToolbar();
@@ -1728,7 +1890,7 @@ function setupEventListeners() {
                     if (id) {
                         selectedQuizIds = selectedQuizIds.filter(qId => qId !== id);
                     }
-                    cardEl.className = 'bg-white rounded-lg shadow-md p-4 flex flex-col cursor-pointer border border-pink-100 transition relative';
+                    cardEl.className = 'bg-white rounded-2xl border border-pink-100 p-5 shadow-sm flex flex-col cursor-pointer hover:border-pink-300 transition-all duration-300 relative';
                 }
             });
             updateBulkActionsToolbar();
@@ -1774,7 +1936,8 @@ function setupEventListeners() {
             selectedQuizIds.forEach(id => {
                 const quiz = userQuizSets.find(q => q.id === id);
                 if (quiz) {
-                    textToShare += `- ${quiz.title}: ${window.location.origin}/quiz.html?id=${id}\n`;
+                    const quizUrl = new URL(`quiz.html?id=${id}`, window.location.href).href;
+                    textToShare += `- ${quiz.title}: ${quizUrl}\n`;
                 }
             });
 
@@ -1866,6 +2029,91 @@ function setupEventListeners() {
         if (e.target.closest('.quiz-menu') || e.target.closest('.folder-menu') || e.target.closest('.quiz-menu-btn') || e.target.closest('.folder-menu-btn')) return;
         document.querySelectorAll('.quiz-menu, .folder-menu').forEach(menu => menu.classList.add('hidden'));
     });
+
+    // Sự kiện kéo thả di chuyển bộ đề về Thư viện gốc (không thư mục)
+    const folderBreadcrumb = document.getElementById('folder-breadcrumb');
+    if (folderBreadcrumb) {
+        folderBreadcrumb.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+        folderBreadcrumb.addEventListener('dragenter', (e) => {
+            e.preventDefault();
+            folderBreadcrumb.classList.add('border-pink-500', 'bg-pink-50/50');
+        });
+        folderBreadcrumb.addEventListener('dragleave', () => {
+            folderBreadcrumb.classList.remove('border-pink-500', 'bg-pink-50/50');
+        });
+        folderBreadcrumb.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            folderBreadcrumb.classList.remove('border-pink-500', 'bg-pink-50/50');
+            const quizId = e.dataTransfer.getData('text/plain');
+            if (!quizId) return;
+            
+            try {
+                isLibraryFullyLoaded = false;
+                const quizDocRef = doc(db, "quiz_sets", quizId);
+                await updateDoc(quizDocRef, { folderId: null });
+                if (typeof showToast === 'function') {
+                    showToast('Đã chuyển bộ đề về Thư viện gốc!', 'success');
+                }
+                await loadAndDisplayLibrary();
+            } catch (err) {
+                console.error("Lỗi kéo thả di chuyển bộ đề về gốc:", err);
+                if (typeof showToast === 'function') {
+                    showToast('Có lỗi xảy ra khi di chuyển về gốc!', 'error');
+                }
+            }
+        });
+    }
+
+    // Sự kiện đóng và sao chép của Modal Chia sẻ
+    const closeShareQuizModalBtn = document.getElementById('closeShareQuizModalBtn');
+    if (closeShareQuizModalBtn) {
+        closeShareQuizModalBtn.addEventListener('click', closeShareQuizModal);
+    }
+    
+    // Đóng modal chia sẻ khi click ra ngoài vùng nội dung modal
+    const shareQuizModal = document.getElementById('shareQuizModal');
+    if (shareQuizModal) {
+        shareQuizModal.addEventListener('click', (e) => {
+            if (e.target === shareQuizModal) {
+                closeShareQuizModal();
+            }
+        });
+    }
+
+    const copyShareLinkBtn = document.getElementById('copy-share-link-btn');
+    if (copyShareLinkBtn) {
+        copyShareLinkBtn.addEventListener('click', () => {
+            const input = document.getElementById('share-link-input');
+            if (input && input.value) {
+                navigator.clipboard.writeText(input.value)
+                    .then(() => {
+                        if (typeof showToast === 'function') showToast('Đã copy link bộ đề!', 'success');
+                    })
+                    .catch(() => {
+                        if (typeof showToast === 'function') showToast('Không thể sao chép tự động!', 'error');
+                    });
+            }
+        });
+    }
+
+    const copyShareEmbedBtn = document.getElementById('copy-share-embed-btn');
+    if (copyShareEmbedBtn) {
+        copyShareEmbedBtn.addEventListener('click', () => {
+            const input = document.getElementById('share-embed-input');
+            if (input && input.value) {
+                navigator.clipboard.writeText(input.value)
+                    .then(() => {
+                        if (typeof showToast === 'function') showToast('Đã copy mã nhúng!', 'success');
+                    })
+                    .catch(() => {
+                        if (typeof showToast === 'function') showToast('Không thể sao chép tự động!', 'error');
+                    });
+            }
+        });
+    }
 }
 
 // === CÁC HÀM NGHIỆP VỤ THƯ MỤC ===
@@ -2142,6 +2390,7 @@ async function confirmDeleteFolder(folderId) {
     if (!confirm("Bạn có chắc chắn muốn xóa thư mục này? Các bộ đề bên trong sẽ được chuyển về thư mục gốc (không bị xóa).")) return;
     
     try {
+        isLibraryFullyLoaded = false;
         const folderRef = doc(db, "quiz_folders", folderId);
         await deleteDoc(folderRef);
 
@@ -2172,6 +2421,7 @@ async function confirmMoveQuiz() {
     if (folderId === 'root') folderId = null;
 
     try {
+        isLibraryFullyLoaded = false;
         if (isBulkMoving) {
             await Promise.all(selectedQuizIds.map(id => {
                 const quizDocRef = doc(db, "quiz_sets", id);
@@ -2192,6 +2442,37 @@ async function confirmMoveQuiz() {
         console.error("Lỗi di chuyển bộ đề:", err);
         alert("Có lỗi xảy ra khi di chuyển bộ đề!");
     }
+}
+
+function openShareQuizModal(quizId, quizTitle) {
+    const modal = document.getElementById('shareQuizModal');
+    const titleEl = document.getElementById('share-quiz-title');
+    const qrImg = document.getElementById('share-qr-img');
+    const linkInput = document.getElementById('share-link-input');
+    const embedInput = document.getElementById('share-embed-input');
+    
+    if (!modal || !titleEl || !qrImg || !linkInput || !embedInput) return;
+
+    // Thiết lập tiêu đề bộ đề
+    titleEl.textContent = quizTitle || 'Bộ đề trắc nghiệm';
+
+    // Tạo URL luyện tập bộ đề
+    const url = new URL(`quiz.html?id=${quizId}`, window.location.href).href;
+    linkInput.value = url;
+
+    // Sinh QR Code
+    qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(url)}`;
+
+    // Tạo mã nhúng Iframe
+    embedInput.value = `<iframe src="${url}" width="100%" height="600" style="border:none; border-radius:12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05);"></iframe>`;
+
+    // Hiện modal
+    modal.classList.remove('hidden');
+}
+
+function closeShareQuizModal() {
+    const modal = document.getElementById('shareQuizModal');
+    if (modal) modal.classList.add('hidden');
 }
 
 // === KHỞI CHẠY ỨNG DỤNG ===

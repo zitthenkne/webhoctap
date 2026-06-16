@@ -190,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (quizId) {
             await setDoc(doc(db, "quiz_sets", quizId), { ...quizData, userId: user.uid });
         } else {
-            await addDoc(collection(db, "quiz_sets"), { ...quizData, userId: user.uid, createdAt: serverTimestamp() });
+            await addDoc(collection(db, "quiz_sets"), { ...quizData, userId: user.uid, createdAt: serverTimestamp(), folderId: null });
         }
         showToast('Bộ đề đã được lưu thành công!', 'success');
         // const user = auth.currentUser;

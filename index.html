@@ -294,14 +294,14 @@
             </div>
 
             <div id="libraryContent" class="content-panel hidden">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-3">
-                    <h2 class="text-2xl font-bold text-[#FF69B4]">Thư viện hạt dẻ</h2>
-                    <div class="flex gap-2">
-                        <button type="button" id="bulk-select-toggle-btn" class="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition font-bold flex items-center gap-2 text-sm focus:outline-none shadow-sm" title="Chọn nhiều bộ đề để thao tác đồng loạt">
-                            <i class="fas fa-tasks"></i> Chọn nhiều
+                <div class="flex flex-row justify-between items-center gap-3 mb-4">
+                    <h2 class="text-xl sm:text-2xl font-extrabold text-[#FF69B4] tracking-wide">Thư viện</h2>
+                    <div class="flex gap-2 flex-shrink-0">
+                        <button type="button" id="bulk-select-toggle-btn" class="px-3 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition font-bold flex items-center gap-1.5 text-xs focus:outline-none shadow-sm" title="Chọn nhiều bộ đề để thao tác đồng loạt">
+                            <i class="fas fa-tasks text-xs"></i> <span>Chọn nhiều</span>
                         </button>
-                        <button type="button" id="create-folder-btn" class="px-4 py-2.5 bg-pink-100 text-pink-700 rounded-xl hover:bg-pink-200 transition font-bold flex items-center gap-2 text-sm focus:outline-none shadow-sm">
-                            <i class="fas fa-folder-plus"></i> Tạo thư mục mới
+                        <button type="button" id="create-folder-btn" class="px-3 py-2 bg-pink-100 text-pink-700 rounded-xl hover:bg-pink-200 transition font-bold flex items-center gap-1.5 text-xs focus:outline-none shadow-sm">
+                            <i class="fas fa-folder-plus text-xs"></i> <span>Tạo thư mục</span>
                         </button>
                     </div>
                 </div>
@@ -309,29 +309,52 @@
                 <div id="folder-breadcrumb" class="flex items-center gap-2 text-sm text-gray-500 mb-4 bg-white p-3 rounded-xl shadow-sm border border-pink-50/50 focus-hide">
                     <span class="cursor-pointer hover:text-pink-500 font-semibold text-pink-500" id="breadcrumb-root"><i class="fas fa-home mr-1"></i>Thư viện gốc</span>
                 </div>
-                <div class="flex flex-col sm:flex-row sm:items-end gap-2 sm:gap-4 mb-6">
-                    <div class="flex items-center gap-4 sm:flex-1">
-                        <label class="inline-flex items-center cursor-pointer">
-                            <input type="radio" name="search-mode" value="quiz" id="search-mode-quiz"
-                                class="form-radio text-pink-500" checked>
-                            <span class="ml-2 text-sm font-semibold text-gray-700">Tìm bộ đề</span>
-                        </label>
-                        <label class="inline-flex items-center cursor-pointer">
-                            <input type="radio" name="search-mode" value="question" id="search-mode-question"
-                                class="form-radio text-pink-500">
-                            <span class="ml-2 text-sm font-semibold text-gray-700">Tìm câu hỏi</span>
-                        </label>
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <!-- Segmented Control thay thế cho Radio thô -->
+                    <div class="bg-gray-200/60 p-1 rounded-xl flex gap-1 w-full sm:max-w-xs border border-gray-200/30">
+                        <button type="button" id="search-mode-quiz-btn" class="flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all duration-200 bg-white text-pink-600 shadow-sm flex items-center justify-center gap-1.5 focus:outline-none">
+                            <i class="fas fa-file-alt text-xs"></i> Tìm bộ đề
+                        </button>
+                        <button type="button" id="search-mode-question-btn" class="flex-1 text-center py-2 text-xs font-bold rounded-lg transition-all duration-200 text-gray-500 hover:text-gray-700 flex items-center justify-center gap-1.5 focus:outline-none">
+                            <i class="fas fa-question-circle text-xs"></i> Tìm câu hỏi
+                        </button>
+                        <!-- Giữ lại các radio ẩn để phục vụ code JS cũ -->
+                        <input type="radio" name="search-mode" value="quiz" id="search-mode-quiz" class="hidden" checked>
+                        <input type="radio" name="search-mode" value="question" id="search-mode-question" class="hidden">
                     </div>
-                    <div class="flex flex-row gap-2 w-full sm:flex-1">
-                        <input type="text" id="library-search-input"
-                            class="px-4 py-2 border border-pink-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#FF69B4] w-full text-base"
-                            placeholder="Tìm kiếm bộ đề...">
+
+                    <!-- Ô tìm kiếm và nút tải lại -->
+                    <div class="flex flex-row gap-2 w-full sm:max-w-md">
+                        <div class="relative flex-1 w-full">
+                            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
+                                <i class="fas fa-search text-xs"></i>
+                            </span>
+                            <input type="text" id="library-search-input"
+                                class="pl-9 pr-4 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#FF69B4] focus:border-[#FF69B4] w-full text-sm transition-all duration-200 shadow-sm"
+                                placeholder="Tìm kiếm bộ đề...">
+                        </div>
                         <button type="button" id="refresh-library-btn"
-                            class="px-4 py-2 text-gray-600 hover:text-pink-500 transition flex-shrink-0"
-                            title="Tải lại"><i class="fas fa-sync-alt"></i></button>
+                            class="w-10 h-10 flex items-center justify-center bg-gray-50 text-gray-500 hover:text-pink-500 rounded-xl border border-gray-200 shadow-sm flex-shrink-0 transition-colors focus:outline-none"
+                            title="Tải lại"><i class="fas fa-sync-alt text-sm"></i></button>
                     </div>
                 </div>
-                <div id="quiz-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Khu vực hiển thị Thư mục cuộn ngang -->
+                <div id="folders-section" class="mb-8 hidden">
+                    <h3 class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <i class="fas fa-folder-open text-pink-400"></i> Thư mục của bạn
+                    </h3>
+                    <div id="folders-container" class="folders-scroll-container scrollbar-none">
+                        <!-- Thư mục render ở đây (cuộn ngang) -->
+                    </div>
+                </div>
+
+                <!-- Khu vực hiển thị Bộ đề -->
+                <div id="quizzes-section">
+                    <h3 id="quizzes-section-title" class="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2 hidden">
+                        <i class="fas fa-file-alt text-pink-400"></i> Bộ đề trắc nghiệm
+                    </h3>
+                    <div id="quiz-list-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    </div>
                 </div>
             </div>
 
@@ -1080,6 +1103,47 @@
             <div class="flex justify-end gap-3">
                 <button type="button" id="closeMoveQuizModalBtn" class="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition font-bold">Hủy</button>
                 <button type="button" id="confirmMoveQuizBtn" class="px-5 py-2.5 bg-[#FF69B4] text-white rounded-xl hover:bg-opacity-80 transition font-bold shadow-md">Xác nhận</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Chia sẻ bộ đề -->
+    <div id="shareQuizModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl transform transition-all mx-4 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-xl font-extrabold text-[#FF69B4] mb-4 flex items-center gap-2">
+                <i class="fas fa-share-alt text-[#FF69B4]"></i> Chia sẻ bộ đề
+            </h3>
+            <div class="space-y-4">
+                <!-- Tên bộ đề -->
+                <p id="share-quiz-title" class="font-bold text-gray-800 text-sm line-clamp-2 bg-pink-50/50 p-2.5 rounded-xl border border-pink-100/50"></p>
+                
+                <!-- QR Code Section -->
+                <div class="flex flex-col items-center justify-center py-3 bg-gray-50 rounded-2xl border border-gray-100">
+                    <img id="share-qr-img" src="" alt="QR Code" class="w-36 h-36 object-contain rounded-lg shadow-sm border border-gray-100 bg-white p-1" />
+                    <span class="text-[10px] text-gray-400 mt-2"><i class="fas fa-qrcode mr-1"></i>Quét mã QR để làm bài trên điện thoại</span>
+                </div>
+
+                <!-- Link Section -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Đường dẫn liên kết</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="share-link-input" readonly class="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none w-full truncate font-mono text-gray-600" />
+                        <button type="button" id="copy-share-link-btn" class="px-3 py-2 bg-[#FF69B4] text-white rounded-xl hover:bg-opacity-90 active:scale-95 transition font-bold text-xs flex items-center gap-1 shadow-sm"><i class="far fa-copy"></i> Copy</button>
+                    </div>
+                </div>
+
+                <!-- Embed Section -->
+                <div>
+                    <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Nhúng vào Notion</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="share-embed-input" readonly class="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-xs bg-gray-50 focus:outline-none w-full truncate font-mono text-gray-600" />
+                        <button type="button" id="copy-share-embed-btn" class="px-3 py-2 bg-indigo-500 text-white rounded-xl hover:bg-opacity-90 active:scale-95 transition font-bold text-xs flex items-center gap-1 shadow-sm"><i class="far fa-copy"></i> Copy</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="flex justify-end gap-3 mt-6">
+                <button type="button" id="closeShareQuizModalBtn" class="px-5 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition font-bold text-sm shadow-sm w-full sm:w-auto">Đóng</button>
             </div>
         </div>
     </div>

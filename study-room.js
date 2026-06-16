@@ -940,7 +940,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 questionCount: finalQuestions.length, // Thêm số lượng câu hỏi
                 createdAt: serverTimestamp(),
                 userId: userId, // Sử dụng 'userId' để nhất quán với thư viện
-                isPublic: true // Luôn public để ai cũng xem được
+                isPublic: true, // Luôn public để ai cũng xem được
+                folderId: null
             };
             try {
                 // Luôn thêm isPublic: true khi lưu vào quiz_sets

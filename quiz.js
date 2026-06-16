@@ -497,7 +497,8 @@ export function initQuiz(params) {
                         explain: q.userExplain || ''
                     })),
                     createdAt: serverTimestamp(),
-                    isPublic: true
+                    isPublic: true,
+                    folderId: null
                 };
 
                 // --- BƯỚC 3: LƯU VÀ DỌN DẸP ---
