@@ -1,0 +1,33 @@
+{
+  "name": "Zitthenkne - Công cụ học tập",
+  "short_name": "Zitthenkne",
+  "description": "Nền tảng học tập với quiz, flashcard, study room, và các công cụ học tập hiệu quả",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FF69B4",
+  "orientation": "portrait-or-landscape",
+  "icons": [
+    {
+      "src": "assets/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "productivity"],
+  "screenshots": [
+    {
+      "src": "assets/logo.png",
+      "sizes": "540x720",
+      "type": "image/png"
+    }
+  ]
+}
