@@ -608,6 +608,14 @@ async function loadAllLibraryInBackground(userId) {
             }
             return { id: doc.id, ...data };
         });
+
+        // Sắp xếp userQuizSets theo createdAt mới nhất trước
+        userQuizSets.sort((a, b) => {
+            const timeA = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+            const timeB = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+            return timeB - timeA;
+        });
+
         isLibraryFullyLoaded = true;
         console.log("Đã tải xong toàn bộ thư viện dưới background và tự động cập nhật các bộ đề cũ.");
         
@@ -634,6 +642,13 @@ function renderLibrary(quizzesToDisplay, page = 1) {
             currentFolderId === null ? (!quiz.folderId) : (quiz.folderId === currentFolderId)
         );
     }
+
+    // Sắp xếp filteredQuizzes theo createdAt mới nhất trước để luôn hiển thị theo cái mới nhất lên trước
+    filteredQuizzes.sort((a, b) => {
+        const timeA = a.createdAt && typeof a.createdAt.toDate === 'function' ? a.createdAt.toDate().getTime() : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+        const timeB = b.createdAt && typeof b.createdAt.toDate === 'function' ? b.createdAt.toDate().getTime() : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+        return timeB - timeA;
+    });
 
     const foldersSection = document.getElementById('folders-section');
     const foldersContainer = document.getElementById('folders-container');
@@ -809,7 +824,16 @@ function renderLibrary(quizzesToDisplay, page = 1) {
         card.className = cardClass;
         card.setAttribute('data-id', quizSet.id);
 
-        const dateStr = quizSet.createdAt && quizSet.createdAt.toDate ? new Date(quizSet.createdAt.toDate()).toLocaleDateString('vi-VN') : 'N/A';
+        let dateStr = 'N/A';
+        if (quizSet.createdAt) {
+            const dateObj = typeof quizSet.createdAt.toDate === 'function' ? quizSet.createdAt.toDate() : new Date(quizSet.createdAt);
+            const hours = String(dateObj.getHours()).padStart(2, '0');
+            const minutes = String(dateObj.getMinutes()).padStart(2, '0');
+            const day = String(dateObj.getDate()).padStart(2, '0');
+            const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const year = dateObj.getFullYear();
+            dateStr = `${hours}:${minutes} ${day}/${month}/${year}`;
+        }
         
         let checkboxHTML = '';
         let menuHTML = '';
